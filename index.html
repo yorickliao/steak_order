@@ -48,7 +48,7 @@
       <div id="seafoodList" class="grid grid-cols-1 md:grid-cols-2 gap-6"></div>
     </div>
     <div class="space-y-3">
-      <h2 class="text-lg font-semibold">雙拼</h2>
+      <h2 class="text-lg font-semibold">超值雙拼</h2>
       <div id="comboList" class="grid grid-cols-1 md:grid-cols-2 gap-6"></div>
     </div>
   </section>
@@ -110,22 +110,72 @@
 </footer>
 
 <script>
+/* === 只需改這兩個設定 === */
 const ENDPOINT = 'https://script.google.com/macros/s/AKfycbxh3LdPhOqe3VPX0Td7tAn3h6kzUARE3w7BvIiww3bGUtCHOFXRnmJdmYLUk8EeyX1X/exec';
 const API_KEY  = 'steak';
+
+/* === 小工具 & 狀態 === */
 const el = s => document.querySelector(s);
 const money = n => '$' + Number(n||0).toLocaleString('zh-Hant');
 const state = { cart: [] };
 
-// === 商品資料（之後可補充） ===
+/* === 醬汁 / 主食 / 加點（勾選） === */
+const SAUCES  = ["黑胡椒醬","蘑菇醬","綜合醬","玫瑰鹽"];
+const STAPLES = ["牛排麵條","通心粉","飯"];
+const ADDONS  = [
+  { id:"加飯麵", price:10 },
+  { id:"加蛋",   price:15 },
+  { id:"加培根", price:40 }
+];
+
+/* === 菜單（依你提供） === */
 const MENU = {
-  pork:    [{ id:"豬排", name:"豬排", price:200 }],
-  beef:    [{ id:"牛排", name:"牛排", price:300 }],
-  chicken: [{ id:"雞腿排", name:"雞腿排", price:180 }],
-  seafood: [{ id:"鮭魚排", name:"鮭魚排", price:280 }],
-  combo:   [{ id:"豬牛雙拼", name:"豬牛雙拼", price:400 }]
+  pork: [
+    { id:"嚴選豬排",       name:"嚴選豬排",       price:150 },
+    { id:"嚴選厚切豬排",   name:"嚴選厚切豬排",   price:190 },
+    { id:"厚切梅花豬排",   name:"厚切梅花豬排",   price:190 },
+    { id:"香煎培根豬排",   name:"香煎培根豬排",   price:190 },
+    { id:"彈牙松板豬排",   name:"彈牙松板豬排",   price:210 },
+    { id:"鄉間風味培根排", name:"鄉間風味培根排", price:150 },
+  ],
+  beef: [
+    { id:"薄片沙朗牛排",     name:"薄片沙朗牛排",     price:150 },
+    { id:"香煎培根豬排",     name:"香煎培根豬排",     price:190 }, // 依你提供原樣放入
+    { id:"厚切沙朗牛排",     name:"厚切沙朗牛排",     price:190 },
+    { id:"厚切板腱牛排",     name:"厚切板腱牛排",     price:210 },
+    { id:"厚切無骨牛小排",   name:"厚切無骨牛小排",   price:210 },
+    { id:"厚切嫩肩菲力牛排", name:"厚切嫩肩菲力牛排", price:210 },
+    { id:"8盎司厚切翼板牛排", name:"8盎司厚切翼板牛排", price:320 },
+    { id:"16盎司厚切肩胛牛排", name:"16盎司厚切肩胛牛排", price:400 },
+  ],
+  chicken: [
+    { id:"香嫩雞胸排",     name:"香嫩雞胸排",     price:160 },
+    { id:"香煎培根雞胸排", name:"香煎培根雞胸排", price:200 },
+    { id:"香煎雞腿排",     name:"香煎雞腿排",     price:160 },
+    { id:"香煎培根雞腿排", name:"香煎培根雞腿排", price:200 },
+  ],
+  seafood: [
+    { id:"鮮嫩魚排", name:"鮮嫩魚排", price:210 },
+    { id:"阿根廷魷魚", name:"阿根廷魷魚", price:210 },
+  ],
+  combo: [
+    { id:"豬+牛",         name:"豬+牛",         price:240 },
+    { id:"豬+雞胸",       name:"豬+雞胸",       price:250 },
+    { id:"牛+雞胸",       name:"牛+雞胸",       price:250 },
+    { id:"牛+雞腿",       name:"牛+雞腿",       price:250 },
+    { id:"厚沙朗+豬",     name:"厚沙朗+豬",     price:280 },
+    { id:"梅花豬+雞腿",   name:"梅花豬+雞腿",   price:290 },
+    { id:"厚豬+雞腿",     name:"厚豬+雞腿",     price:290 },
+    { id:"魷魚+豬",       name:"魷魚+豬",       price:300 },
+    { id:"雞腿+魷魚",     name:"雞腿+魷魚",     price:310 },
+    { id:"厚沙朗+厚豬",   name:"厚沙朗+厚豬",   price:320 },
+    { id:"牛小排+鱈魚",   name:"牛小排+鱈魚",   price:360 },
+    { id:"厚菲力+厚板腱", name:"厚菲力+厚板腱", price:360 },
+    { id:"松板豬+魷魚",   name:"松板豬+魷魚",   price:370 },
+  ],
 };
 
-// === Render function ===
+/* === Render：分類卡片 === */
 function renderCategory(list, targetId){
   const root = el(targetId); root.innerHTML='';
   list.forEach(item=>{
@@ -137,36 +187,114 @@ function renderCategory(list, targetId){
         <div class="text-right font-semibold mono">${money(item.price)}</div>
       </div>
       <div class="mt-4 flex justify-end">
-        <button class="btn px-4 py-2 bg-slate-900 text-white hover:bg-slate-800">加入</button>
+        <button class="btn px-4 py-2 bg-slate-900 text-white hover:bg-slate-800">選擇</button>
       </div>`;
-    card.querySelector('button').addEventListener('click', ()=> addToCart(item));
+    card.querySelector('button').addEventListener('click', ()=> openItemModal(item));
     root.appendChild(card);
   });
 }
 
-function addToCart(item){ state.cart.push({ ...item, qty:1 }); renderCart(); }
-function removeCartEntry(index){ state.cart.splice(index,1); renderCart(); }
-function cartTotal(){ return state.cart.reduce((s,it)=>s+it.price*it.qty,0); }
+/* === Modal（選醬汁 / 主食 / 加點（勾選） / 數量） === */
+let currentItem = null;
+function openItemModal(item){
+  currentItem = item; document.body.classList.add('overflow-hidden');
+  el('#pmTitle').textContent = item.name;
 
+  // 醬汁
+  const sauceSel = el('#pmSauce'); sauceSel.innerHTML='';
+  SAUCES.forEach(s=>{ const o=document.createElement('option'); o.value=s; o.textContent=s; sauceSel.appendChild(o); });
+
+  // 主食
+  const stapleSel = el('#pmStaple'); stapleSel.innerHTML='';
+  STAPLES.forEach(s=>{ const o=document.createElement('option'); o.value=s; o.textContent=s; stapleSel.appendChild(o); });
+
+  // 加點（checkbox）
+  const ex = el('#pmAddons'); ex.innerHTML='';
+  ADDONS.forEach((a,idx)=>{
+    const id = `addon_${idx}`;
+    const row = document.createElement('label');
+    row.className='flex items-center justify-between gap-3 border border-slate-200 rounded-lg px-3 py-2 cursor-pointer';
+    row.innerHTML = `
+      <div class="flex items-center gap-2">
+        <input type="checkbox" id="${id}" class="addonChk w-4 h-4">
+        <span class="font-medium">${a.id}</span>
+      </div>
+      <div class="text-sm mono">${money(a.price)}</div>`;
+    ex.appendChild(row);
+  });
+
+  el('#pmQty').value = 1;
+  updatePmSubtotal();
+  el('#pmAdd').onclick = ()=>{
+    const qty = Math.max(1, parseInt(el('#pmQty').value)||1);
+    const sauce = el('#pmSauce').value;
+    const staple = el('#pmStaple').value;
+    const selectedAddons = [];
+    el('#pmAddons').querySelectorAll('.addonChk').forEach((chk, i)=>{
+      if(chk.checked) selectedAddons.push(ADDONS[i]);
+    });
+    addToCart({ item: currentItem, sauce, staple, addons: selectedAddons, qty });
+  };
+
+  el('#itemModal').classList.remove('hidden');
+}
+function closeItemModal(){ el('#itemModal').classList.add('hidden'); document.body.classList.remove('overflow-hidden'); currentItem=null; }
+function updatePmSubtotal(){
+  if(!currentItem) return;
+  const qty = Math.max(1, parseInt(el('#pmQty').value)||1);
+  const addonSum = Array.from(el('#pmAddons').querySelectorAll('.addonChk'))
+    .reduce((s,chk,i)=> s + (chk.checked ? ADDONS[i].price : 0), 0);
+  const subtotal = currentItem.price * qty + addonSum * qty; // 加點為每份計價
+  el('#pmSubtotal').textContent = money(subtotal);
+}
+el('#pmDec')?.addEventListener('click', ()=>{ const q=el('#pmQty'); q.value=Math.max(1,(parseInt(q.value)||1)-1); updatePmSubtotal(); });
+el('#pmInc')?.addEventListener('click', ()=>{ const q=el('#pmQty'); q.value=(parseInt(q.value)||1)+1; updatePmSubtotal(); });
+el('#pmQty')?.addEventListener('input', updatePmSubtotal);
+document.addEventListener('change', (ev)=>{
+  if(ev.target && ev.target.classList && ev.target.classList.contains('addonChk')) updatePmSubtotal();
+});
+['pmSauce','pmStaple'].forEach(id=> el('#'+id)?.addEventListener('change', updatePmSubtotal));
+
+/* === Cart === */
+function addToCart(bundle){
+  state.cart.push({ type:'meal', ...bundle });
+  renderCart(); closeItemModal();
+}
+function removeCartEntry(index){ state.cart.splice(index,1); renderCart(); }
+function cartTotal(){
+  return state.cart.reduce((sum,e)=>{
+    if(e.type==='meal'){
+      const addonSum = (e.addons||[]).reduce((s,a)=> s+a.price, 0);
+      return sum + e.item.price*e.qty + addonSum*e.qty;
+    }
+    return sum;
+  }, 0);
+}
 function renderCart(){
   const root=el('#cartItems'); root.innerHTML='';
   if(state.cart.length===0){ root.innerHTML='<div class="text-slate-500">購物車目前沒有商品。</div>'; }
-  state.cart.forEach((it,idx)=>{
-    const price=it.price*it.qty;
+  state.cart.forEach((e, idx)=>{
+    const addonText = (e.addons||[]).length ? e.addons.map(a=>a.id).join('、') : '(無加點)';
+    const linePrice = e.item.price*e.qty + (e.addons||[]).reduce((s,a)=> s+a.price,0)*e.qty;
     const div=document.createElement('div');
-    div.className='card bg-white p-4 flex items-center justify-between gap-3';
+    div.className='card bg-white p-4';
     div.innerHTML=`
-      <div class="min-w-0">
-        <div class="font-medium">${it.name}</div>
-        <div class="text-sm text-slate-600">
-          單價 ${money(it.price)} ×
-          <input type="number" min="1" value="${it.qty}" class="lineQty w-16 text-center border border-slate-300 rounded-lg py-1 mx-1 bg-white text-slate-900">
-          = <span class="mono">${money(price)}</span>
+      <div class="flex items-start justify-between gap-3">
+        <div class="min-w-0">
+          <div class="font-medium">${e.item.name} ｜ 醬汁：${e.sauce} ｜ 主食：${e.staple}</div>
+          <div class="text-sm text-slate-700 mt-1">加點：${addonText}</div>
+          <div class="text-sm text-slate-600 mt-1">
+            數量 ×
+            <input type="number" min="1" value="${e.qty}" class="lineQty w-16 text-center border border-slate-300 rounded-lg py-1 mx-1 bg-white text-slate-900">
+          </div>
         </div>
-      </div>
-      <button class="remove btn px-3 py-2 border border-slate-300 hover:bg-slate-100">移除</button>`;
+        <div class="shrink-0 text-right">
+          <div class="font-semibold mono">${money(linePrice)}</div>
+          <button class="remove btn mt-2 px-3 py-2 border border-slate-300 hover:bg-slate-100">移除</button>
+        </div>
+      </div>`;
     div.querySelector('.lineQty').addEventListener('input', ev=>{
-      let v=parseInt(ev.target.value)||1; if(v<1)v=1; it.qty=v; renderCart();
+      let v=parseInt(ev.target.value)||1; if(v<1)v=1; e.qty=v; renderCart();
     });
     div.querySelector('.remove').addEventListener('click', ()=> removeCartEntry(idx));
     root.appendChild(div);
@@ -174,7 +302,7 @@ function renderCart(){
   el('#cartTotal').textContent=money(cartTotal());
 }
 
-// === API ===
+/* === API === */
 async function apiCreate(order){
   const body={ apiKey:API_KEY, action:'create', order };
   const r=await fetch(ENDPOINT,{ method:'POST', body:JSON.stringify(body) });
@@ -182,7 +310,7 @@ async function apiCreate(order){
   return d;
 }
 
-// === Submit ===
+/* === Submit === */
 async function onSubmitOrder(e){
   e.preventDefault();
   const btn=e.target.querySelector('button[type="submit"]');
@@ -195,8 +323,15 @@ async function onSubmitOrder(e){
     const phone=el('#customerPhone').value.trim();
     if(!name||!phone){ showErr('請完整填寫姓名與電話。'); return; }
 
-    const items=state.cart.map(it=>({ id:it.id, name:it.name, price:it.price, qty:it.qty }));
-    const subtotal=items.reduce((s,it)=>s+it.price*it.qty,0);
+    // 組訂單品項（名稱含選項與加點）
+    const items = state.cart.map(e=>{
+      const addonText = (e.addons||[]).length ? '｜加點：'+e.addons.map(a=>a.id).join('、') : '';
+      const nameWith = `${e.item.name}｜醬汁：${e.sauce}｜主食：${e.staple}${addonText}`;
+      // 單價 = 基底 + 加點合計
+      const unitPrice = e.item.price + (e.addons||[]).reduce((s,a)=> s+a.price, 0);
+      return { id:e.item.id, name:nameWith, price:unitPrice, qty:e.qty };
+    });
+    const subtotal = items.reduce((s,it)=> s + it.price*it.qty, 0);
 
     // 下單時間 +15 分鐘
     const pickupDate=new Date(Date.now()+15*60000);
@@ -219,11 +354,11 @@ async function onSubmitOrder(e){
     el('#pickupNoText').textContent=resp.pickupNo||'';
     el('#successModal').classList.remove('hidden');
   }catch(err){
-    showErr('送單失敗：'+err.message);
+    el('#formError').textContent = '送單失敗：'+err.message;
   }finally{ setBusy(false); }
 }
 
-// === Init ===
+/* === Init === */
 document.addEventListener('DOMContentLoaded',()=>{
   el('#year').textContent=new Date().getFullYear();
   renderCategory(MENU.pork,'#porkList');
@@ -237,5 +372,50 @@ document.addEventListener('DOMContentLoaded',()=>{
   el('#closeSuccess').addEventListener('click',()=>el('#successModal').classList.add('hidden'));
 });
 </script>
+
+<!-- 選項彈窗 -->
+<div id="itemModal" class="fixed inset-0 z-40 hidden scroll-y">
+  <div class="absolute inset-0 bg-black/40"></div>
+  <div class="relative z-10 min-h-full flex items-start justify-center py-6 px-3">
+    <div class="w-full max-w-2xl card bg-white p-6 max-h-[85vh] scroll-y">
+      <div class="flex items-start justify-between">
+        <div class="min-w-0">
+          <h3 id="pmTitle" class="text-xl font-semibold"></h3>
+        </div>
+        <button onclick="closeItemModal()" class="btn px-3 py-2 border border-slate-300 hover:bg-slate-100">關閉</button>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+        <div>
+          <label class="text-sm text-slate-600">醬汁</label>
+          <select id="pmSauce" class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 bg-white text-slate-900"></select>
+        </div>
+        <div>
+          <label class="text-sm text-slate-600">主食</label>
+          <select id="pmStaple" class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 bg-white text-slate-900"></select>
+        </div>
+      </div>
+
+      <div class="mt-5">
+        <label class="text-sm text-slate-600">加點（勾選即可）</label>
+        <div id="pmAddons" class="mt-2 grid grid-cols-1 md:grid-cols-2 gap-3"></div>
+      </div>
+
+      <div class="mt-5">
+        <label class="text-sm text-slate-600">數量</label>
+        <div class="mt-1 flex items-center gap-2">
+          <button id="pmDec" class="btn px-3 py-2 border border-slate-300 hover:bg-slate-100">-</button>
+          <input id="pmQty" type="number" min="1" value="1" class="w-20 text-center border border-slate-300 rounded-xl py-2 bg-white text-slate-900" />
+          <button id="pmInc" class="btn px-3 py-2 border border-slate-300 hover:bg-slate-100">+</button>
+        </div>
+      </div>
+
+      <div class="mt-6 flex items-center justify-between">
+        <div class="text-lg">小計：<span id="pmSubtotal" class="font-semibold mono">$0</span></div>
+        <button id="pmAdd" class="btn px-4 py-2 bg-slate-900 text-white hover:bg-slate-800">加入購物車</button>
+      </div>
+    </div>
+  </div>
+</div>
 </body>
 </html>
