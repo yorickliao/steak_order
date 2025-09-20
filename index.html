@@ -139,13 +139,13 @@ const MENU = {
     { id:"鄉間風味培根排", name:"鄉間風味培根排", price:150 },
   ],
   beef: [
-    { id:"薄片沙朗牛排",     name:"薄片沙朗牛排",     price:150 },
-    { id:"香煎培根豬排",     name:"香煎培根豬排",     price:190 }, // 依你提供原樣放入
-    { id:"厚切沙朗牛排",     name:"厚切沙朗牛排",     price:190 },
-    { id:"厚切板腱牛排",     name:"厚切板腱牛排",     price:210 },
-    { id:"厚切無骨牛小排",   name:"厚切無骨牛小排",   price:210 },
-    { id:"厚切嫩肩菲力牛排", name:"厚切嫩肩菲力牛排", price:210 },
-    { id:"8盎司厚切翼板牛排", name:"8盎司厚切翼板牛排", price:320 },
+    { id:"薄片沙朗牛排",       name:"薄片沙朗牛排",       price:150 },
+    { id:"香煎培根豬排",       name:"香煎培根豬排",       price:190 }, // 按你的清單原樣
+    { id:"厚切沙朗牛排",       name:"厚切沙朗牛排",       price:190 },
+    { id:"厚切板腱牛排",       name:"厚切板腱牛排",       price:210 },
+    { id:"厚切無骨牛小排",     name:"厚切無骨牛小排",     price:210 },
+    { id:"厚切嫩肩菲力牛排",   name:"厚切嫩肩菲力牛排",   price:210 },
+    { id:"8盎司厚切翼板牛排",  name:"8盎司厚切翼板牛排",  price:320 },
     { id:"16盎司厚切肩胛牛排", name:"16盎司厚切肩胛牛排", price:400 },
   ],
   chicken: [
@@ -197,7 +197,8 @@ function renderCategory(list, targetId){
 /* === Modal（選醬汁 / 主食 / 加點（勾選） / 數量） === */
 let currentItem = null;
 function openItemModal(item){
-  currentItem = item; document.body.classList.add('overflow-hidden');
+  currentItem = item;
+  document.body.classList.add('overflow-hidden');
   el('#pmTitle').textContent = item.name;
 
   // 醬汁
@@ -223,10 +224,24 @@ function openItemModal(item){
     ex.appendChild(row);
   });
 
-  el('#pmQty').value = 1;
+  // 數量初始與小計
+  const qtyInput = el('#pmQty');
+  qtyInput.value = 1;
   updatePmSubtotal();
+
+  // 這裡「每次開啟彈窗」都重新綁事件，確保元素已存在
+  el('#pmDec').onclick = ()=>{ qtyInput.value = Math.max(1, (parseInt(qtyInput.value)||1) - 1); updatePmSubtotal(); };
+  el('#pmInc').onclick = ()=>{ qtyInput.value = (parseInt(qtyInput.value)||1) + 1; updatePmSubtotal(); };
+  qtyInput.oninput = updatePmSubtotal;
+
+  // 勾選加點或更換醬汁/主食時，更新小計（醬汁/主食本身不加價，但維持即時計算習慣）
+  el('#pmAddons').onchange = updatePmSubtotal;
+  el('#pmSauce').onchange = updatePmSubtotal;
+  el('#pmStaple').onchange = updatePmSubtotal;
+
+  // 加入購物車
   el('#pmAdd').onclick = ()=>{
-    const qty = Math.max(1, parseInt(el('#pmQty').value)||1);
+    const qty = Math.max(1, parseInt(qtyInput.value)||1);
     const sauce = el('#pmSauce').value;
     const staple = el('#pmStaple').value;
     const selectedAddons = [];
@@ -238,7 +253,11 @@ function openItemModal(item){
 
   el('#itemModal').classList.remove('hidden');
 }
-function closeItemModal(){ el('#itemModal').classList.add('hidden'); document.body.classList.remove('overflow-hidden'); currentItem=null; }
+function closeItemModal(){
+  el('#itemModal').classList.add('hidden');
+  document.body.classList.remove('overflow-hidden');
+  currentItem = null;
+}
 function updatePmSubtotal(){
   if(!currentItem) return;
   const qty = Math.max(1, parseInt(el('#pmQty').value)||1);
@@ -247,13 +266,6 @@ function updatePmSubtotal(){
   const subtotal = currentItem.price * qty + addonSum * qty; // 加點為每份計價
   el('#pmSubtotal').textContent = money(subtotal);
 }
-el('#pmDec')?.addEventListener('click', ()=>{ const q=el('#pmQty'); q.value=Math.max(1,(parseInt(q.value)||1)-1); updatePmSubtotal(); });
-el('#pmInc')?.addEventListener('click', ()=>{ const q=el('#pmQty'); q.value=(parseInt(q.value)||1)+1; updatePmSubtotal(); });
-el('#pmQty')?.addEventListener('input', updatePmSubtotal);
-document.addEventListener('change', (ev)=>{
-  if(ev.target && ev.target.classList && ev.target.classList.contains('addonChk')) updatePmSubtotal();
-});
-['pmSauce','pmStaple'].forEach(id=> el('#'+id)?.addEventListener('change', updatePmSubtotal));
 
 /* === Cart === */
 function addToCart(bundle){
@@ -397,7 +409,7 @@ document.addEventListener('DOMContentLoaded',()=>{
       </div>
 
       <div class="mt-5">
-        <label class="text-sm text-slate-600">加點（勾選即可）</label>
+        <label class="text-sm text-slate-600">加點</label>
         <div id="pmAddons" class="mt-2 grid grid-cols-1 md:grid-cols-2 gap-3"></div>
       </div>
 
