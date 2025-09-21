@@ -72,23 +72,22 @@ function fmtMoney(n){ return '$' + Number(n||0).toLocaleString('zh-Hant'); }
 function nowTime(){ const d=new Date(); return d.toLocaleTimeString('zh-TW',{hour12:false}); }
 function todayIso(){ const d=new Date(); d.setHours(0,0,0,0); return d.toISOString().slice(0,10); } // YYYY-MM-DD
 
-// 從 "yyyy/MM/dd HH:mm[:ss]" 只取 "HH:mm"
+// 從多種格式抓出 "HH:mm"（支援 "YYYY/MM/DD HH:mm:ss"、"YYYY-MM-DDTHH:mm:ssZ"、純 HH:mm）
 function onlyHHmm(pickupTime){
-  if (!pickupTime) return '';
-  // 取時間部分
-  const parts = String(pickupTime).split(' ');
-  const time = parts.length > 1 ? parts[1] : pickupTime;
-  return time.slice(0,5);
+  const s = String(pickupTime || '');
+  const m = s.match(/(\d{2}:\d{2})/);   // 抓第一個 HH:mm
+  return m ? m[1] : '';
 }
 
-// 日期篩選（比較 pickupTime 的日期部分）
+// 依日期篩選（支援 "YYYY/MM/DD" 或 "YYYY-MM-DD"）
 function rowMatchesDate(order, yyyy_mm_dd){
-  if (!yyyy_mm_dd) return true; // 不選日期則不篩
-  const pt = String(order.pickupTime || '');
-  if (pt.length < 10) return false;
-  // 將yyyy/MM/dd 轉成 yyyy-MM-dd 比對
-  const datePart = pt.slice(0,10).replace(/\//g,'-');
-  return datePart === yyyy_mm_dd;
+  if (!yyyy_mm_dd) return true;
+  const s = String(order.pickupTime || '');
+  // 先抓日期 "YYYY/MM/DD" 或 "YYYY-MM-DD"
+  const dm = s.match(/(\d{4})[/-](\d{2})[/-](\d{2})/);
+  if (!dm) return false;
+  const norm = `${dm[1]}-${dm[2]}-${dm[3]}`; // 轉成 YYYY-MM-DD
+  return norm === yyyy_mm_dd;
 }
 
 async function loadOrders(){
