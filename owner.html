@@ -35,6 +35,8 @@
           <div id="meta" class="text-sm text-slate-500"></div>
         </div>
         <div class="flex items-center gap-2">
+          <label class="text-sm text-slate-600">日期</label>
+          <input id="datePicker" type="date" class="rounded-xl border border-slate-300 px-3 py-2">
           <input id="q" type="search" placeholder="搜尋 姓名/電話/品項/號碼" class="rounded-xl border border-slate-300 px-3 py-2 w-64" />
           <button id="btnReload" class="btn px-3 py-2 border border-slate-300 hover:bg-slate-100">重新整理</button>
         </div>
@@ -58,44 +60,85 @@
 
 <script>
 const ENDPOINT = 'https://script.google.com/macros/s/AKfycbwI9TSy1QcRvh7JkODJ3_0eltp3SCDHCCWCVkcaKqJTcaA5PR2NFdNEhUYoymywIkTB/exec';
-const API_KEY  = 'steak';
-
-// 前端簡易密碼 (只檢查字串)
-const FRONTEND_PASSWORD = "steak";  
+const FRONTEND_PASSWORD = "steak";
 
 const el = s => document.querySelector(s);
-let ORDERS = [];
+let ORDERS_ALL = [];   // 後端回來的全部
+let ORDERS = [];       // 套用日期/搜尋後的清單
+let isLoading = false;
+let refreshTimer = null;
 
 function fmtMoney(n){ return '$' + Number(n||0).toLocaleString('zh-Hant'); }
+function nowTime(){ const d=new Date(); return d.toLocaleTimeString('zh-TW',{hour12:false}); }
+function todayIso(){ const d=new Date(); d.setHours(0,0,0,0); return d.toISOString().slice(0,10); } // YYYY-MM-DD
+
+// 從 "yyyy/MM/dd HH:mm[:ss]" 只取 "HH:mm"
+function onlyHHmm(pickupTime){
+  if (!pickupTime) return '';
+  // 取時間部分
+  const parts = String(pickupTime).split(' ');
+  const time = parts.length > 1 ? parts[1] : pickupTime;
+  return time.slice(0,5);
+}
+
+// 日期篩選（比較 pickupTime 的日期部分）
+function rowMatchesDate(order, yyyy_mm_dd){
+  if (!yyyy_mm_dd) return true; // 不選日期則不篩
+  const pt = String(order.pickupTime || '');
+  if (pt.length < 10) return false;
+  // 將yyyy/MM/dd 轉成 yyyy-MM-dd 比對
+  const datePart = pt.slice(0,10).replace(/\//g,'-');
+  return datePart === yyyy_mm_dd;
+}
 
 async function loadOrders(){
+  if (isLoading) return;
+  isLoading = true;
   el('#meta').textContent = '載入中…';
-  const url = `${ENDPOINT}?action=list`; // 後端已公開 list
-  const r = await fetch(url);
-  const t = await r.text();
-  let d; try{ d = JSON.parse(t) } catch { throw new Error('回應非 JSON：'+t.slice(0,200)); }
+  const url = `${ENDPOINT}?action=list&_=${Date.now()}`;
+  try {
+    const r = await fetch(url);
+    const t = await r.text();
+    if (!r.ok) throw new Error(`HTTP ${r.status}: ${t.slice(0,120)}`);
+    const d = JSON.parse(t);
+    if (!d.ok) throw new Error(d.error || 'unknown');
+    ORDERS_ALL = d.orders || [];
+    applyFilters(); // 依日期/搜尋套用
+    el('#meta').textContent = `共 ${ORDERS.length} 筆　最後更新：${nowTime()}（每 15 秒自動更新）`;
+    renderTable();
+  } catch (e) {
+    el('#meta').textContent = '載入失敗：' + e.message;
+  } finally {
+    isLoading = false;
+  }
+}
 
-  if(!d.ok) throw new Error(d.error || 'unknown');
-  ORDERS = d.orders || [];
-  el('#meta').textContent = `共 ${ORDERS.length} 筆`;
-  renderTable();
+function applyFilters(){
+  const q = (el('#q').value || '').trim();
+  const chosenDate = el('#datePicker').value || '';
+  // 先按日期篩
+  let rows = ORDERS_ALL.filter(o => rowMatchesDate(o, chosenDate));
+  // 再按搜尋詞篩
+  if (q) {
+    rows = rows.filter(o=>{
+      const s = `${o.name||''} ${o.phone||''} ${o.items||''} ${o.pickupNo||''}`;
+      return s.includes(q);
+    });
+  }
+  ORDERS = rows;
 }
 
 function renderTable(){
-  const q = (el('#q').value || '').trim();
-  const rows = (!q) ? ORDERS : ORDERS.filter(o=>{
-    const s = `${o.name||''} ${o.phone||''} ${o.items||''} ${o.pickupNo||''}`; 
-    return s.includes(q);
-  });
-
   const tb = el('#tbody'); tb.innerHTML='';
-  rows.forEach(o=>{
+  ORDERS.forEach(o=>{
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td class="mono">${o.pickupNo || ''}</td>
-      <td>${o.name || ''}</td>
-      <td class="mono">${o.phone || ''}</td>
-      <td class="mono">${o.pickupTime || ''}</td>
+      <td>
+        <div class="font-medium">${o.name || ''}</div>
+        <div class="text-slate-500 text-sm mono">${o.phone || ''}</div>
+      </td>
+      <td class="mono">${onlyHHmm(o.pickupTime)}</td>
       <td style="min-width:260px">${(o.items||'').replace(/\n/g,'<br>')}</td>
       <td class="mono text-right">${fmtMoney(o.total||0)}</td>
     `;
@@ -103,8 +146,18 @@ function renderTable(){
   });
 }
 
+// 自動更新
+function startAutoRefresh(){
+  stopAutoRefresh();
+  refreshTimer = setInterval(()=>{
+    if (!document.hidden) loadOrders();
+  }, 15000);
+}
+function stopAutoRefresh(){
+  if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null; }
+}
 
-// === 登入邏輯 (純前端) ===
+// 登入（純前端）
 el('#loginForm').addEventListener('submit', async (ev)=>{
   ev.preventDefault();
   const key = el('#adminKey').value.trim();
@@ -112,20 +165,31 @@ el('#loginForm').addEventListener('submit', async (ev)=>{
     el('#loginErr').textContent = '密碼錯誤';
     return;
   }
-  // 通過，顯示清單卡
   el('#loginCard').classList.add('hidden');
   el('#listCard').classList.remove('hidden');
-  try{
-    await loadOrders();
-  }catch(err){
-    el('#meta').textContent = '載入失敗：'+err.message;
-  }
+
+  // 預設日期為今天
+  el('#datePicker').value = todayIso();
+
+  await loadOrders();
+  startAutoRefresh();
 });
 
-// 搜尋
-el('#q').addEventListener('input', renderTable);
-// 重新整理
+// 事件：搜尋 / 日期改變 / 手動重新整理
+el('#q').addEventListener('input', ()=>{
+  applyFilters();
+  renderTable();
+});
+el('#datePicker').addEventListener('change', ()=>{
+  applyFilters();
+  renderTable();
+});
 el('#btnReload').addEventListener('click', loadOrders);
+
+// 顯示回前景時立即刷新一次（可選）
+document.addEventListener('visibilitychange', ()=>{
+  if (!document.hidden && refreshTimer) loadOrders();
+});
 </script>
 </body>
 </html>
