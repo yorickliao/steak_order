@@ -93,15 +93,16 @@ function renderTable(){
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td class="mono">${o.pickupNo || ''}</td>
-      <td><div class="font-medium">${o.name||''}</div><div class="text-slate-500 text-sm">${o.phone||''}</div></td>
-      <td class="mono">${o.pickupTime||''}</td>
+      <td>${o.name || ''}</td>
+      <td class="mono">${o.phone || ''}</td>
+      <td class="mono">${o.pickupTime || ''}</td>
       <td style="min-width:260px">${(o.items||'').replace(/\n/g,'<br>')}</td>
       <td class="mono text-right">${fmtMoney(o.total||0)}</td>
-      <td class="mono text-sm text-slate-600">${o.createdAt||''}</td>
     `;
     tb.appendChild(tr);
   });
 }
+
 
 // === 登入邏輯 (純前端) ===
 el('#loginForm').addEventListener('submit', async (ev)=>{
