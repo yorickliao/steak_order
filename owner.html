@@ -37,6 +37,7 @@
         <div class="flex items-center gap-2">
           <label class="text-sm text-slate-600">日期</label>
           <input id="datePicker" type="date" class="rounded-xl border border-slate-300 px-3 py-2">
+          <button id="btnToday" class="btn px-3 py-2 border border-slate-300 hover:bg-slate-100">今天</button>
           <input id="q" type="search" placeholder="搜尋 姓名/電話/品項/號碼" class="rounded-xl border border-slate-300 px-3 py-2 w-64" />
           <button id="btnReload" class="btn px-3 py-2 border border-slate-300 hover:bg-slate-100">重新整理</button>
         </div>
@@ -63,30 +64,31 @@ const ENDPOINT = 'https://script.google.com/macros/s/AKfycbxNLnpOV_kwYPbPT1J9lrx
 const FRONTEND_PASSWORD = "steak";
 
 const el = s => document.querySelector(s);
-let ORDERS_ALL = [];   // 後端回來的全部
-let ORDERS = [];       // 套用日期/搜尋後的清單
+let ORDERS_ALL = [];
+let ORDERS = [];
 let isLoading = false;
 let refreshTimer = null;
 
 function fmtMoney(n){ return '$' + Number(n||0).toLocaleString('zh-Hant'); }
 function nowTime(){ const d=new Date(); return d.toLocaleTimeString('zh-TW',{hour12:false}); }
-function todayIso(){ const d=new Date(); d.setHours(0,0,0,0); return d.toISOString().slice(0,10); } // YYYY-MM-DD
-
-// 從多種格式抓出 "HH:mm"（支援 "YYYY/MM/DD HH:mm:ss"、"YYYY-MM-DDTHH:mm:ssZ"、純 HH:mm）
+function todayLocal(){
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,'0');
+  const day = String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
 function onlyHHmm(pickupTime){
   const s = String(pickupTime || '');
-  const m = s.match(/(\d{2}:\d{2})/);   // 抓第一個 HH:mm
+  const m = s.match(/(\d{2}:\d{2})/);
   return m ? m[1] : '';
 }
-
-// 依日期篩選（支援 "YYYY/MM/DD" 或 "YYYY-MM-DD"）
 function rowMatchesDate(order, yyyy_mm_dd){
   if (!yyyy_mm_dd) return true;
   const s = String(order.pickupTime || '');
-  // 先抓日期 "YYYY/MM/DD" 或 "YYYY-MM-DD"
   const dm = s.match(/(\d{4})[/-](\d{2})[/-](\d{2})/);
   if (!dm) return false;
-  const norm = `${dm[1]}-${dm[2]}-${dm[3]}`; // 轉成 YYYY-MM-DD
+  const norm = `${dm[1]}-${dm[2]}-${dm[3]}`;
   return norm === yyyy_mm_dd;
 }
 
@@ -102,7 +104,7 @@ async function loadOrders(){
     const d = JSON.parse(t);
     if (!d.ok) throw new Error(d.error || 'unknown');
     ORDERS_ALL = d.orders || [];
-    applyFilters(); // 依日期/搜尋套用
+    applyFilters();
     el('#meta').textContent = `共 ${ORDERS.length} 筆　最後更新：${nowTime()}（每 15 秒自動更新）`;
     renderTable();
   } catch (e) {
@@ -115,9 +117,7 @@ async function loadOrders(){
 function applyFilters(){
   const q = (el('#q').value || '').trim();
   const chosenDate = el('#datePicker').value || '';
-  // 先按日期篩
   let rows = ORDERS_ALL.filter(o => rowMatchesDate(o, chosenDate));
-  // 再按搜尋詞篩
   if (q) {
     rows = rows.filter(o=>{
       const s = `${o.name||''} ${o.phone||''} ${o.items||''} ${o.pickupNo||''}`;
@@ -145,7 +145,6 @@ function renderTable(){
   });
 }
 
-// 自動更新
 function startAutoRefresh(){
   stopAutoRefresh();
   refreshTimer = setInterval(()=>{
@@ -156,7 +155,6 @@ function stopAutoRefresh(){
   if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null; }
 }
 
-// 登入（純前端）
 el('#loginForm').addEventListener('submit', async (ev)=>{
   ev.preventDefault();
   const key = el('#adminKey').value.trim();
@@ -167,25 +165,23 @@ el('#loginForm').addEventListener('submit', async (ev)=>{
   el('#loginCard').classList.add('hidden');
   el('#listCard').classList.remove('hidden');
 
-  // 預設日期為今天
-  el('#datePicker').value = todayIso();
+  el('#datePicker').value = todayLocal(); // 預設今天
 
   await loadOrders();
   startAutoRefresh();
 });
 
-// 事件：搜尋 / 日期改變 / 手動重新整理
-el('#q').addEventListener('input', ()=>{
-  applyFilters();
-  renderTable();
-});
-el('#datePicker').addEventListener('change', ()=>{
-  applyFilters();
-  renderTable();
-});
+el('#q').addEventListener('input', ()=>{ applyFilters(); renderTable(); });
+el('#datePicker').addEventListener('change', ()=>{ applyFilters(); renderTable(); });
 el('#btnReload').addEventListener('click', loadOrders);
 
-// 顯示回前景時立即刷新一次（可選）
+// 今天按鈕：直接跳回今天
+el('#btnToday').addEventListener('click', ()=>{
+  el('#datePicker').value = todayLocal();
+  applyFilters();
+  renderTable();
+});
+
 document.addEventListener('visibilitychange', ()=>{
   if (!document.hidden && refreshTimer) loadOrders();
 });
