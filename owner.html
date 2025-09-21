@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>行家牛排 訂單管理</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <meta name="color-scheme" content="light">
+  <style>
+    .card{border-radius:1rem}.btn{border-radius:1rem}
+    .container-slim{max-width:1100px}
+    table{border-collapse:collapse;width:100%}
+    th,td{border-bottom:1px solid #e2e8f0;padding:.6rem .75rem;vertical-align:top}
+    th{background:#f8fafc;text-align:left;font-weight:600}
+    .mono{font-variant-numeric:tabular-nums}
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-900">
+  <main class="mx-auto container-slim px-4 py-6">
+    <!-- 登入卡 -->
+    <div id="loginCard" class="card bg-white p-6 max-w-md mx-auto">
+      <h2 class="text-lg font-semibold mb-3">管理登入</h2>
+      <form id="loginForm" class="space-y-3">
+        <input id="adminKey" type="password" class="w-full rounded-xl border border-slate-300 px-3 py-2" placeholder="請輸入密碼" required />
+        <button class="w-full btn px-4 py-2 bg-slate-900 text-white hover:bg-slate-800">登入</button>
+        <p id="loginErr" class="text-sm text-red-600"></p>
+      </form>
+    </div>
+
+    <!-- 清單卡 -->
+    <div id="listCard" class="card bg-white p-6 hidden">
+      <div class="flex items-end justify-between gap-3 mb-4">
+        <div>
+          <div class="text-lg font-semibold">訂單清單</div>
+          <div id="meta" class="text-sm text-slate-500"></div>
+        </div>
+        <div class="flex items-center gap-2">
+          <input id="q" type="search" placeholder="搜尋 姓名/電話/品項/號碼" class="rounded-xl border border-slate-300 px-3 py-2 w-64" />
+          <button id="btnReload" class="btn px-3 py-2 border border-slate-300 hover:bg-slate-100">重新整理</button>
+        </div>
+      </div>
+      <div class="overflow-x-auto">
+        <table id="tbl">
+          <thead>
+            <tr>
+              <th>取餐號</th>
+              <th>姓名 / 電話</th>
+              <th>取餐時間</th>
+              <th>品項</th>
+              <th class="text-right">金額</th>
+              <th>建立時間</th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+<script>
+const ENDPOINT = 'https://script.google.com/macros/s/AKfycbxh3LdPhOqe3VPX0Td7tAn3h6kzUARE3w7BvIiww3bGUtCHOFXRnmJdmYLUk8EeyX1X/exec';
+
+// 前端簡易密碼 (只檢查字串)
+const FRONTEND_PASSWORD = "steak";  
+
+const el = s => document.querySelector(s);
+let ORDERS = [];
+
+function fmtMoney(n){ return '$' + Number(n||0).toLocaleString('zh-Hant'); }
+
+async function loadOrders(){
+  el('#meta').textContent = '載入中…';
+  const url = `${ENDPOINT}?action=list`; // 後端已公開 list
+  const r = await fetch(url);
+  const t = await r.text();
+  let d; try{ d = JSON.parse(t) } catch { throw new Error('回應非 JSON：'+t.slice(0,200)); }
+
+  if(!d.ok) throw new Error(d.error || 'unknown');
+  ORDERS = d.orders || [];
+  el('#meta').textContent = `共 ${ORDERS.length} 筆`;
+  renderTable();
+}
+
+function renderTable(){
+  const q = (el('#q').value || '').trim();
+  const rows = (!q) ? ORDERS : ORDERS.filter(o=>{
+    const s = `${o.name||''} ${o.phone||''} ${o.items||''} ${o.pickupNo||''}`; 
+    return s.includes(q);
+  });
+
+  const tb = el('#tbody'); tb.innerHTML='';
+  rows.forEach(o=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="mono">${o.pickupNo || ''}</td>
+      <td><div class="font-medium">${o.name||''}</div><div class="text-slate-500 text-sm">${o.phone||''}</div></td>
+      <td class="mono">${o.pickupTime||''}</td>
+      <td style="min-width:260px">${(o.items||'').replace(/\n/g,'<br>')}</td>
+      <td class="mono text-right">${fmtMoney(o.total||0)}</td>
+      <td class="mono text-sm text-slate-600">${o.createdAt||''}</td>
+    `;
+    tb.appendChild(tr);
+  });
+}
+
+// === 登入邏輯 (純前端) ===
+el('#loginForm').addEventListener('submit', async (ev)=>{
+  ev.preventDefault();
+  const key = el('#adminKey').value.trim();
+  if(key !== FRONTEND_PASSWORD){
+    el('#loginErr').textContent = '密碼錯誤';
+    return;
+  }
+  // 通過，顯示清單卡
+  el('#loginCard').classList.add('hidden');
+  el('#listCard').classList.remove('hidden');
+  try{
+    await loadOrders();
+  }catch(err){
+    el('#meta').textContent = '載入失敗：'+err.message;
+  }
+});
+
+// 搜尋
+el('#q').addEventListener('input', renderTable);
+// 重新整理
+el('#btnReload').addEventListener('click', loadOrders);
+</script>
+</body>
+</html>
