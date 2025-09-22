@@ -118,6 +118,10 @@ const API_KEY  = 'steak';
 const el = s => document.querySelector(s);
 const money = n => '$' + Number(n||0).toLocaleString('zh-Hant');
 const state = { cart: [] };
+const onlyHHmm = (s) => {
+  const m = String(s || '').match(/(\d{2}):(\d{2})/);
+  return m ? `${m[1]}:${m[2]}` : '';
+};
 
 /* === 醬汁 / 主食 / 加點（勾選） === */
 const SAUCES  = ["黑胡椒醬","蘑菇醬","綜合醬","玫瑰鹽"];
@@ -140,7 +144,7 @@ const MENU = {
   ],
   beef: [
     { id:"薄片沙朗牛排",       name:"薄片沙朗牛排",       price:150 },
-    { id:"香煎培根豬排",       name:"香煎培根豬排",       price:190 }, // 按你的清單原樣
+    { id:"香煎培根豬排",       name:"香煎培根豬排",       price:190 },
     { id:"厚切沙朗牛排",       name:"厚切沙朗牛排",       price:190 },
     { id:"厚切板腱牛排",       name:"厚切板腱牛排",       price:210 },
     { id:"厚切無骨牛小排",     name:"厚切無骨牛小排",     price:210 },
@@ -229,12 +233,10 @@ function openItemModal(item){
   qtyInput.value = 1;
   updatePmSubtotal();
 
-  // 這裡「每次開啟彈窗」都重新綁事件，確保元素已存在
   el('#pmDec').onclick = ()=>{ qtyInput.value = Math.max(1, (parseInt(qtyInput.value)||1) - 1); updatePmSubtotal(); };
   el('#pmInc').onclick = ()=>{ qtyInput.value = (parseInt(qtyInput.value)||1) + 1; updatePmSubtotal(); };
   qtyInput.oninput = updatePmSubtotal;
 
-  // 勾選加點或更換醬汁/主食時，更新小計（醬汁/主食本身不加價，但維持即時計算習慣）
   el('#pmAddons').onchange = updatePmSubtotal;
   el('#pmSauce').onchange = updatePmSubtotal;
   el('#pmStaple').onchange = updatePmSubtotal;
@@ -317,7 +319,11 @@ function renderCart(){
 /* === API === */
 async function apiCreate(order){
   const body={ apiKey:API_KEY, action:'create', order };
-  const r=await fetch(ENDPOINT,{ method:'POST', body:JSON.stringify(body) });
+  const r=await fetch(ENDPOINT,{
+    method:'POST',
+    headers:{ 'Content-Type':'application/json' },
+    body:JSON.stringify(body)
+  });
   const t=await r.text(); let d; try{ d=JSON.parse(t) }catch{ throw new Error('bad_json:'+t.slice(0,200)); }
   return d;
 }
@@ -339,32 +345,39 @@ async function onSubmitOrder(e){
     const items = state.cart.map(e=>{
       const addonText = (e.addons||[]).length ? '｜加點：'+e.addons.map(a=>a.id).join('、') : '';
       const nameWith = `${e.item.name}｜醬汁：${e.sauce}｜主食：${e.staple}${addonText}`;
-      // 單價 = 基底 + 加點合計
       const unitPrice = e.item.price + (e.addons||[]).reduce((s,a)=> s+a.price, 0);
       return { id:e.item.id, name:nameWith, price:unitPrice, qty:e.qty };
     });
     const subtotal = items.reduce((s,it)=> s + it.price*it.qty, 0);
 
-    // 下單時間 +15 分鐘
-    const pickupDate=new Date(Date.now()+15*60000);
-    const pickupTime=pickupDate.toLocaleString('zh-TW',{hour12:false});
-
+    // 交由後端決定取餐時間（不再前端自算）
     const order={
       id:'O'+Date.now(),
       customer:{ name, phone },
-      pickupTime,
       items, subtotal, total:subtotal,
       createdAt:new Date().toISOString(),
       source:'web-customer'
     };
 
     const resp=await apiCreate(order);
-    if(!resp.ok){ showErr(`送單失敗：${resp.error||'create_failed'}`); return; }
+    if(!resp.ok){
+      // 優先顯示後端提供的友善訊息
+      const friendly = resp.message
+        || (resp.error==='closed_day' ? '本店每週一、三公休，今日不接受訂單。'
+            : resp.error==='outside_hours' ? '目前非營業時間（營業時間 17:00–22:00），暫不接受訂單。'
+            : resp.error==='too_late_today' ? '今日已停止接單，請下次營業時間再下單。'
+            : `送單失敗：${resp.error||'create_failed'}`);
+      showErr(friendly);
+      return;
+    }
 
     state.cart=[]; renderCart();
-    el('#assignedSlotText').textContent=pickupTime;
-    el('#pickupNoText').textContent=resp.pickupNo||'';
+
+    // 成功視窗只顯示「幾點幾分」
+    el('#assignedSlotText').textContent = onlyHHmm(resp.assignedPickupTime || '');
+    el('#pickupNoText').textContent = resp.pickupNo || '';
     el('#successModal').classList.remove('hidden');
+
   }catch(err){
     el('#formError').textContent = '送單失敗：'+err.message;
   }finally{ setBusy(false); }
