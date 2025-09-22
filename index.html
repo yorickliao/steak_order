@@ -316,17 +316,25 @@ function renderCart(){
   el('#cartTotal').textContent=money(cartTotal());
 }
 
-/* === API === */
+/* === API（修正：移除 Content-Type，避免 CORS 預檢） === */
 async function apiCreate(order){
-  const body={ apiKey:API_KEY, action:'create', order };
-  const r=await fetch(ENDPOINT,{
-    method:'POST',
-    headers:{ 'Content-Type':'application/json' },
-    body:JSON.stringify(body)
+  const body = { apiKey: API_KEY, action: 'create', order };
+  const r = await fetch(ENDPOINT, {
+    method: 'POST',
+    // 不要加 headers: {'Content-Type':'application/json'}
+    body: JSON.stringify(body)
   });
-  const t=await r.text(); let d; try{ d=JSON.parse(t) }catch{ throw new Error('bad_json:'+t.slice(0,200)); }
+  const t = await r.text();
+  let d;
+  try {
+    d = JSON.parse(t);
+  } catch {
+    // 若 Web App 未設為「任何人可存取」，這裡會拿到 Google 登入頁 HTML
+    throw new Error('bad_json:' + t.slice(0, 200));
+  }
   return d;
 }
+
 
 /* === Submit === */
 async function onSubmitOrder(e){
