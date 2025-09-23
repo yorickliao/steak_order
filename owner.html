@@ -31,15 +31,16 @@
     <div id="listCard" class="card bg-white p-6 hidden">
       <div class="flex items-end justify-between gap-3 mb-4">
         <div>
-          <div class="text-lg font-semibold">訂單清單</div>
+          <div class="text-lg font-semibold">訂單清單 <span id="pauseBadge" class="ml-2 hidden text-xs px-2 py-1 rounded-full bg-red-100 text-red-700 align-middle">已停止接單</span></div>
           <div id="meta" class="text-sm text-slate-500"></div>
         </div>
         <div class="flex items-center gap-2">
           <label class="text-sm text-slate-600">日期</label>
           <input id="datePicker" type="date" class="rounded-xl border border-slate-300 px-3 py-2">
           <button id="btnToday" class="btn px-3 py-2 border border-slate-300 hover:bg-slate-100">今天</button>
-          <input id="q" type="search" placeholder="搜尋 姓名/電話/品項/號碼" class="rounded-xl border border-slate-300 px-3 py-2 w-64" />
+          <input id="q" type="search" placeholder="搜尋 姓名/電話/品項/#號碼" class="rounded-xl border border-slate-300 px-3 py-2 w-64" />
           <button id="btnReload" class="btn px-3 py-2 border border-slate-300 hover:bg-slate-100">重新整理</button>
+          <button id="btnTogglePause" class="btn px-3 py-2 border border-slate-300 hover:bg-slate-100">停止接單</button>
         </div>
       </div>
       <div class="overflow-x-auto">
@@ -60,7 +61,7 @@
   </main>
 
 <script>
-const ENDPOINT = 'https://script.google.com/macros/s/AKfycbxXZcKI1vfbZC7iS8M5nFLAm1QclcDTRnyXVJdBGpj25N3lc00U5-bo1Se-_pSHLz4d/exec';
+const ENDPOINT = 'https://script.google.com/macros/s/AKfycbySoN480O_ztltgXjW7wibq3itxlb_YCp2YyZgnHIhE7JrVt0_TKw7dzRatLTxQqbPM/exec';
 const FRONTEND_PASSWORD = "steak";
 
 const el = s => document.querySelector(s);
@@ -68,6 +69,7 @@ let ORDERS_ALL = [];
 let ORDERS = [];
 let isLoading = false;
 let refreshTimer = null;
+let paused = false; // 是否停止接單（從後端讀）
 
 function fmtMoney(n){ return '$' + Number(n||0).toLocaleString('zh-Hant'); }
 function nowTime(){ const d=new Date(); return d.toLocaleTimeString('zh-TW',{hour12:false}); }
@@ -90,6 +92,44 @@ function rowMatchesDate(order, yyyy_mm_dd){
   if (!dm) return false;
   const norm = `${dm[1]}-${dm[2]}-${dm[3]}`;
   return norm === yyyy_mm_dd;
+}
+
+function updatePauseUI(){
+  const badge = el('#pauseBadge');
+  const btn = el('#btnTogglePause');
+  if (paused) {
+    badge.classList.remove('hidden');
+    btn.textContent = '恢復接單';
+  } else {
+    badge.classList.add('hidden');
+    btn.textContent = '停止接單';
+  }
+}
+
+async function getStatus(){
+  const url = `${ENDPOINT}?action=status&_=${Date.now()}`;
+  try {
+    const r = await fetch(url);
+    const t = await r.text();
+    const d = JSON.parse(t);
+    if (d && d.ok && 'paused' in d) {
+      paused = !!d.paused;
+      updatePauseUI();
+    }
+  } catch(e) {
+    // 忽略狀態載入錯誤，不阻塞頁面
+  }
+}
+
+async function setPause(next){
+  const payload = { action:'set_pause', adminKey: FRONTEND_PASSWORD, value: next ? 1 : 0 };
+  const r = await fetch(ENDPOINT, { method:'POST', body: JSON.stringify(payload) });
+  const t = await r.text();
+  let d;
+  try { d = JSON.parse(t); } catch { throw new Error('回應格式錯誤'); }
+  if (!d.ok) throw new Error(d.error || 'set_pause_failed');
+  paused = !!d.paused;
+  updatePauseUI();
 }
 
 async function loadOrders(){
@@ -115,12 +155,13 @@ async function loadOrders(){
 }
 
 function applyFilters(){
-  const q = (el('#q').value || '').trim();
+  const qRaw = (el('#q').value || '').trim();
+  const q = qRaw.startsWith('#') ? qRaw.slice(1) : qRaw; // 支援輸入 #12
   const chosenDate = el('#datePicker').value || '';
   let rows = ORDERS_ALL.filter(o => rowMatchesDate(o, chosenDate));
   if (q) {
     rows = rows.filter(o=>{
-      const s = `${o.name||''} ${o.phone||''} ${o.items||''} ${o.pickupNo||''}`;
+      const s = `${o.name||''} ${o.phone||''} ${o.items||''} ${o.pickupNo||''} #${o.pickupNo||''}`;
       return s.includes(q);
     });
   }
@@ -132,7 +173,7 @@ function renderTable(){
   ORDERS.forEach(o=>{
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td class="mono">${o.pickupNo || ''}</td>
+      <td class="mono">#${o.pickupNo || ''}</td>
       <td>
         <div class="font-medium">${o.name || ''}</div>
         <div class="text-slate-500 text-sm mono">${o.phone || ''}</div>
@@ -147,8 +188,10 @@ function renderTable(){
 
 function startAutoRefresh(){
   stopAutoRefresh();
-  refreshTimer = setInterval(()=>{
-    if (!document.hidden) loadOrders();
+  refreshTimer = setInterval(async ()=>{
+    if (!document.hidden) {
+      await Promise.all([loadOrders(), getStatus()]);
+    }
   }, 15000);
 }
 function stopAutoRefresh(){
@@ -167,13 +210,15 @@ el('#loginForm').addEventListener('submit', async (ev)=>{
 
   el('#datePicker').value = todayLocal(); // 預設今天
 
-  await loadOrders();
+  await Promise.all([loadOrders(), getStatus()]);
   startAutoRefresh();
 });
 
 el('#q').addEventListener('input', ()=>{ applyFilters(); renderTable(); });
 el('#datePicker').addEventListener('change', ()=>{ applyFilters(); renderTable(); });
-el('#btnReload').addEventListener('click', loadOrders);
+el('#btnReload').addEventListener('click', async ()=>{
+  await Promise.all([loadOrders(), getStatus()]);
+});
 
 // 今天按鈕：直接跳回今天
 el('#btnToday').addEventListener('click', ()=>{
@@ -182,8 +227,23 @@ el('#btnToday').addEventListener('click', ()=>{
   renderTable();
 });
 
-document.addEventListener('visibilitychange', ()=>{
-  if (!document.hidden && refreshTimer) loadOrders();
+// 停止/恢復接單
+el('#btnTogglePause').addEventListener('click', async ()=>{
+  const btn = el('#btnTogglePause');
+  btn.disabled = true;
+  try {
+    await setPause(!paused);
+  } catch(e) {
+    alert('切換失敗：' + e.message);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+document.addEventListener('visibilitychange', async ()=>{
+  if (!document.hidden && refreshTimer) {
+    await Promise.all([loadOrders(), getStatus()]);
+  }
 });
 </script>
 </body>
