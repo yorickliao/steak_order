@@ -17,7 +17,7 @@
 </head>
 <body class="bg-slate-50 text-slate-900">
 
-  <!-- 置頂導覽（新：顯示接單狀態／切換／最近同步） -->
+  <!-- 置頂導覽 -->
   <header class="sticky top-0 z-30 bg-white/80 backdrop-blur border-b border-slate-200">
     <div class="mx-auto container-slim px-4 py-3 flex items-center justify-between">
       <div class="flex items-center gap-3 min-w-0">
@@ -50,13 +50,21 @@
       </form>
     </div>
 
-    <!-- 控制列卡（新：日期、刷新、自動更新、時區顯示） -->
+    <!-- 控制列卡 -->
     <div id="controlsCard" class="card bg-white p-5 mb-5 hidden">
       <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+        <!-- 把搜尋移到「今天」旁邊 -->
         <div class="flex items-center gap-3 flex-wrap">
           <label class="text-sm text-slate-600">查詢日期</label>
           <input id="datePicker" type="date" class="rounded-xl border border-slate-300 px-3 py-2">
           <button id="btnToday" class="btn px-3 py-2 border border-slate-300 hover:bg-slate-100">今天</button>
+
+          <!-- 分隔線（大螢幕出現） -->
+          <span class="hidden md:inline-block w-px h-6 bg-slate-200"></span>
+
+          <!-- 搜尋框（新位置） -->
+          <input id="q" type="search" placeholder="搜尋 姓名/電話/品項/#號碼"
+                 class="rounded-xl border border-slate-300 px-3 py-2 w-full md:w-80" />
         </div>
 
         <div class="flex items-center gap-3 flex-wrap">
@@ -87,11 +95,7 @@
           <tbody id="tbody"></tbody>
         </table>
       </div>
-
-      <!-- 搜尋列（移至表格下方，節省上方空間） -->
-      <div class="mt-5 flex items-center gap-3">
-        <input id="q" type="search" placeholder="搜尋 姓名/電話/品項/#號碼" class="rounded-xl border border-slate-300 px-3 py-2 w-full md:w-80" />
-      </div>
+      <!-- 原本表格下方的搜尋列已移除 -->
     </div>
   </main>
 
@@ -104,8 +108,8 @@ let ORDERS_ALL = [];
 let ORDERS = [];
 let isLoading = false;
 let refreshTimer = null;
-let paused = false;      // 後端回報：是否停止接單
-let autoRefresh = true;  // 自動更新開關
+let paused = false;
+let autoRefresh = true;
 let lastSync = '--';
 
 function fmtMoney(n){ return '$' + Number(n||0).toLocaleString('zh-Hant'); }
@@ -153,9 +157,7 @@ async function getStatus(){
       paused = !!d.paused;
       updateStatusPill();
     }
-  } catch(e) {
-    // 忽略錯誤
-  }
+  } catch(e) {}
 }
 
 async function setPause(next){
@@ -194,7 +196,7 @@ async function loadOrders(){
 
 function applyFilters(){
   const qRaw = (el('#q').value || '').trim();
-  const q = qRaw.startsWith('#') ? qRaw.slice(1) : qRaw; // 支援輸入 #12
+  const q = qRaw.startsWith('#') ? qRaw.slice(1) : qRaw;
   const chosenDate = el('#datePicker').value || '';
   let rows = ORDERS_ALL.filter(o => rowMatchesDate(o, chosenDate));
   if (q) {
@@ -247,7 +249,7 @@ el('#loginForm').addEventListener('submit', async (ev)=>{
   el('#controlsCard').classList.remove('hidden');
   el('#listCard').classList.remove('hidden');
 
-  el('#datePicker').value = todayLocal(); // 預設今天
+  el('#datePicker').value = todayLocal();
 
   await Promise.all([loadOrders(), getStatus()]);
   updateStatusPill();
@@ -259,33 +261,20 @@ el('#datePicker').addEventListener('change', ()=>{ applyFilters(); renderTable()
 el('#btnReload').addEventListener('click', async ()=>{
   await Promise.all([loadOrders(), getStatus()]);
 });
-
-// 今天按鈕：直接跳回今天
 el('#btnToday').addEventListener('click', ()=>{
   el('#datePicker').value = todayLocal();
   applyFilters();
   renderTable();
 });
-
-// 自動更新開關
 el('#autoRefresh').addEventListener('change', (e)=>{
   autoRefresh = !!e.target.checked;
   if (autoRefresh && !refreshTimer) startAutoRefresh();
 });
-
-// 置頂切換接單
 el('#togglePauseHeader').addEventListener('click', async ()=>{
   const btn = el('#togglePauseHeader');
   btn.disabled = true;
-  try {
-    await setPause(!paused);
-  } catch(e) {
-    alert('切換失敗：' + e.message);
-  } finally {
-    btn.disabled = false;
-  }
+  try { await setPause(!paused); } catch(e) { alert('切換失敗：' + e.message); } finally { btn.disabled = false; }
 });
-
 document.addEventListener('visibilitychange', async ()=>{
   if (!document.hidden && refreshTimer) {
     await Promise.all([loadOrders(), getStatus()]);
