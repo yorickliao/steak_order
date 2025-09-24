@@ -16,6 +16,29 @@
   </style>
 </head>
 <body class="bg-slate-50 text-slate-900">
+
+  <!-- 置頂導覽（新：顯示接單狀態／切換／最近同步） -->
+  <header class="sticky top-0 z-30 bg-white/80 backdrop-blur border-b border-slate-200">
+    <div class="mx-auto container-slim px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-3 min-w-0">
+        <div class="w-10 h-10 bg-slate-900 text-white rounded-xl grid place-items-center text-lg font-bold select-none">管</div>
+        <div class="min-w-0">
+          <div class="text-xl font-semibold truncate">行家牛排 訂單管理</div>
+          <div class="text-xs text-slate-500">營業 17:00–22:00 ・ 自動每 15 秒更新</div>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <div class="hidden sm:block text-sm text-slate-600">接單狀態：</div>
+        <span id="statusPill" class="px-3 py-1 rounded-full text-sm font-medium bg-slate-200 text-slate-700">讀取中</span>
+        <button id="togglePauseHeader" class="btn px-3 py-2 border border-slate-300 hover:bg-slate-100">暫停接單</button>
+        <div class="hidden md:block text-sm text-slate-600">
+          最近同步：<span id="lastSync" class="font-medium">--</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
   <main class="mx-auto container-slim px-4 py-6">
     <!-- 登入卡 -->
     <div id="loginCard" class="card bg-white p-6 max-w-md mx-auto">
@@ -27,22 +50,29 @@
       </form>
     </div>
 
-    <!-- 清單卡 -->
-    <div id="listCard" class="card bg-white p-6 hidden">
-      <div class="flex items-end justify-between gap-3 mb-4">
-        <div>
-          <div class="text-lg font-semibold">訂單清單 <span id="pauseBadge" class="ml-2 hidden text-xs px-2 py-1 rounded-full bg-red-100 text-red-700 align-middle">已停止接單</span></div>
-          <div id="meta" class="text-sm text-slate-500"></div>
-        </div>
-        <div class="flex items-center gap-2">
-          <label class="text-sm text-slate-600">日期</label>
+    <!-- 控制列卡（新：日期、刷新、自動更新、時區顯示） -->
+    <div id="controlsCard" class="card bg-white p-5 mb-5 hidden">
+      <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+        <div class="flex items-center gap-3 flex-wrap">
+          <label class="text-sm text-slate-600">查詢日期</label>
           <input id="datePicker" type="date" class="rounded-xl border border-slate-300 px-3 py-2">
           <button id="btnToday" class="btn px-3 py-2 border border-slate-300 hover:bg-slate-100">今天</button>
-          <input id="q" type="search" placeholder="搜尋 姓名/電話/品項/#號碼" class="rounded-xl border border-slate-300 px-3 py-2 w-64" />
-          <button id="btnReload" class="btn px-3 py-2 border border-slate-300 hover:bg-slate-100">重新整理</button>
-          <button id="btnTogglePause" class="btn px-3 py-2 border border-slate-300 hover:bg-slate-100">停止接單</button>
+        </div>
+
+        <div class="flex items-center gap-3 flex-wrap">
+          <button id="btnReload" class="px-4 py-2 rounded-xl bg-slate-900 text-white hover:bg-slate-800">刷新</button>
+          <label class="inline-flex items-center gap-2 text-sm text-slate-700">
+            <input id="autoRefresh" type="checkbox" class="w-4 h-4" checked>
+            自動每 15 秒更新
+          </label>
+          <span class="px-3 py-1 rounded-xl text-sm bg-slate-100 text-slate-700">台北時區</span>
         </div>
       </div>
+      <div class="text-sm text-slate-500 mt-3" id="meta"></div>
+    </div>
+
+    <!-- 清單卡 -->
+    <div id="listCard" class="card bg-white p-6 hidden">
       <div class="overflow-x-auto">
         <table id="tbl">
           <thead>
@@ -57,6 +87,11 @@
           <tbody id="tbody"></tbody>
         </table>
       </div>
+
+      <!-- 搜尋列（移至表格下方，節省上方空間） -->
+      <div class="mt-5 flex items-center gap-3">
+        <input id="q" type="search" placeholder="搜尋 姓名/電話/品項/#號碼" class="rounded-xl border border-slate-300 px-3 py-2 w-full md:w-80" />
+      </div>
     </div>
   </main>
 
@@ -69,10 +104,12 @@ let ORDERS_ALL = [];
 let ORDERS = [];
 let isLoading = false;
 let refreshTimer = null;
-let paused = false; // 是否停止接單（從後端讀）
+let paused = false;      // 後端回報：是否停止接單
+let autoRefresh = true;  // 自動更新開關
+let lastSync = '--';
 
 function fmtMoney(n){ return '$' + Number(n||0).toLocaleString('zh-Hant'); }
-function nowTime(){ const d=new Date(); return d.toLocaleTimeString('zh-TW',{hour12:false}); }
+function nowTime(){ const d=new Date(); return d.toLocaleString('zh-TW',{hour12:false}); }
 function todayLocal(){
   const d = new Date();
   const y = d.getFullYear();
@@ -94,16 +131,16 @@ function rowMatchesDate(order, yyyy_mm_dd){
   return norm === yyyy_mm_dd;
 }
 
-function updatePauseUI(){
-  const badge = el('#pauseBadge');
-  const btn = el('#btnTogglePause');
-  if (paused) {
-    badge.classList.remove('hidden');
-    btn.textContent = '恢復接單';
-  } else {
-    badge.classList.add('hidden');
-    btn.textContent = '停止接單';
-  }
+function setLastSync(){
+  lastSync = nowTime();
+  el('#lastSync').textContent = lastSync;
+}
+
+function updateStatusPill(){
+  const pill = el('#statusPill');
+  pill.textContent = paused ? '暫停接單' : '接受中';
+  pill.className = 'px-3 py-1 rounded-full text-sm font-medium ' + (paused ? 'bg-slate-200 text-slate-700' : 'bg-green-100 text-green-700');
+  el('#togglePauseHeader').textContent = paused ? '恢復接單' : '暫停接單';
 }
 
 async function getStatus(){
@@ -114,10 +151,10 @@ async function getStatus(){
     const d = JSON.parse(t);
     if (d && d.ok && 'paused' in d) {
       paused = !!d.paused;
-      updatePauseUI();
+      updateStatusPill();
     }
   } catch(e) {
-    // 忽略狀態載入錯誤，不阻塞頁面
+    // 忽略錯誤
   }
 }
 
@@ -129,7 +166,7 @@ async function setPause(next){
   try { d = JSON.parse(t); } catch { throw new Error('回應格式錯誤'); }
   if (!d.ok) throw new Error(d.error || 'set_pause_failed');
   paused = !!d.paused;
-  updatePauseUI();
+  updateStatusPill();
 }
 
 async function loadOrders(){
@@ -145,8 +182,9 @@ async function loadOrders(){
     if (!d.ok) throw new Error(d.error || 'unknown');
     ORDERS_ALL = d.orders || [];
     applyFilters();
-    el('#meta').textContent = `共 ${ORDERS.length} 筆　最後更新：${nowTime()}（每 15 秒自動更新）`;
     renderTable();
+    setLastSync();
+    el('#meta').textContent = `共 ${ORDERS.length} 筆　最後更新：${lastSync}`;
   } catch (e) {
     el('#meta').textContent = '載入失敗：' + e.message;
   } finally {
@@ -189,7 +227,7 @@ function renderTable(){
 function startAutoRefresh(){
   stopAutoRefresh();
   refreshTimer = setInterval(async ()=>{
-    if (!document.hidden) {
+    if (!document.hidden && autoRefresh) {
       await Promise.all([loadOrders(), getStatus()]);
     }
   }, 15000);
@@ -206,11 +244,13 @@ el('#loginForm').addEventListener('submit', async (ev)=>{
     return;
   }
   el('#loginCard').classList.add('hidden');
+  el('#controlsCard').classList.remove('hidden');
   el('#listCard').classList.remove('hidden');
 
   el('#datePicker').value = todayLocal(); // 預設今天
 
   await Promise.all([loadOrders(), getStatus()]);
+  updateStatusPill();
   startAutoRefresh();
 });
 
@@ -227,9 +267,15 @@ el('#btnToday').addEventListener('click', ()=>{
   renderTable();
 });
 
-// 停止/恢復接單
-el('#btnTogglePause').addEventListener('click', async ()=>{
-  const btn = el('#btnTogglePause');
+// 自動更新開關
+el('#autoRefresh').addEventListener('change', (e)=>{
+  autoRefresh = !!e.target.checked;
+  if (autoRefresh && !refreshTimer) startAutoRefresh();
+});
+
+// 置頂切換接單
+el('#togglePauseHeader').addEventListener('click', async ()=>{
+  const btn = el('#togglePauseHeader');
   btn.disabled = true;
   try {
     await setPause(!paused);
