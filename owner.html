@@ -208,9 +208,18 @@ function applyFilters(){
 }
 
 function renderTable(){
-  const tb = el('#tbody'); tb.innerHTML='';
+  const tb = el('#tbody'); 
+  tb.innerHTML='';
   ORDERS.forEach(o=>{
     const tr = document.createElement('tr');
+
+    // 依照換行符號分開餐點
+    let itemsHtml = '';
+    if (o.items) {
+      const lines = o.items.split(/\n/).map(s => s.trim()).filter(s => s);
+      itemsHtml = lines.map(line => `<div>${line}</div>`).join('');
+    }
+
     tr.innerHTML = `
       <td class="mono">#${o.pickupNo || ''}</td>
       <td>
@@ -218,12 +227,13 @@ function renderTable(){
         <div class="text-slate-500 text-sm mono">${o.phone || ''}</div>
       </td>
       <td class="mono">${onlyHHmm(o.pickupTime)}</td>
-      <td style="min-width:260px">${(o.items||'').replace(/\n/g,'<br>')}</td>
+      <td style="min-width:260px">${itemsHtml}</td>
       <td class="mono text-right">${fmtMoney(o.total||0)}</td>
     `;
     tb.appendChild(tr);
   });
 }
+
 
 function startAutoRefresh(){
   stopAutoRefresh();
