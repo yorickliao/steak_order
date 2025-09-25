@@ -213,10 +213,13 @@ function renderTable(){
   ORDERS.forEach(o=>{
     const tr = document.createElement('tr');
 
-    // 依照換行符號分開餐點
     let itemsHtml = '';
     if (o.items) {
-      const lines = o.items.split(/\n/).map(s => s.trim()).filter(s => s);
+      // 先把全形頓號「、」換成換行，再 split
+      const lines = o.items.replace(/、/g, '\n')
+                           .split(/\n/)
+                           .map(s => s.trim())
+                           .filter(s => s);
       itemsHtml = lines.map(line => `<div>${line}</div>`).join('');
     }
 
@@ -233,6 +236,7 @@ function renderTable(){
     tb.appendChild(tr);
   });
 }
+
 
 
 function startAutoRefresh(){
