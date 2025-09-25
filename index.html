@@ -126,8 +126,8 @@ const onlyHHmm = (s) => {
 };
 
 /* === 醬汁 / 主食 / 加點（勾選） === */
-const SAUCES  = ["黑胡椒醬","蘑菇醬","綜合醬","玫瑰鹽"];
-const STAPLES = ["牛排麵條","通心粉","飯"];
+const SAUCES  = ["黑胡椒醬","蘑菇醬","綜合醬","蘑菇+玫瑰鹽","黑胡椒+玫瑰鹽","都不要醬+玫瑰鹽"];
+const STAPLES = ["牛排麵條","通心麵","飯"];
 const ADDONS  = [
   { id:"加飯麵", price:10 },
   { id:"加蛋",   price:15 },
@@ -146,7 +146,7 @@ const MENU = {
   ],
   beef: [
     { id:"薄片沙朗牛排",       name:"薄片沙朗牛排",       price:150 },
-    { id:"香煎培根豬排",       name:"香煎培根豬排",       price:190 },
+    { id:"香煎培根牛排",       name:"香煎培根牛排",       price:190 },
     { id:"厚切沙朗牛排",       name:"厚切沙朗牛排",       price:190 },
     { id:"厚切板腱牛排",       name:"厚切板腱牛排",       price:210 },
     { id:"厚切無骨牛小排",     name:"厚切無骨牛小排",     price:210 },
@@ -161,7 +161,7 @@ const MENU = {
     { id:"香煎培根雞腿排", name:"香煎培根雞腿排", price:200 },
   ],
   seafood: [
-    { id:"鮮嫩魚排", name:"鮮嫩魚排", price:210 },
+    { id:"嫩鮭魚排", name:"嫩鮭魚排", price:210 },
     { id:"阿根廷魷魚", name:"阿根廷魷魚", price:210 },
   ],
   combo: [
@@ -175,7 +175,7 @@ const MENU = {
     { id:"魷魚+豬",       name:"魷魚+豬",       price:300 },
     { id:"雞腿+魷魚",     name:"雞腿+魷魚",     price:310 },
     { id:"厚沙朗+厚豬",   name:"厚沙朗+厚豬",   price:320 },
-    { id:"牛小排+鱈魚",   name:"牛小排+鱈魚",   price:360 },
+    { id:"牛小排+鮭魚",   name:"牛小排+鮭魚",   price:360 },
     { id:"厚菲力+厚板腱", name:"厚菲力+厚板腱", price:360 },
     { id:"松板豬+魷魚",   name:"松板豬+魷魚",   price:370 },
   ],
@@ -297,7 +297,7 @@ function renderCart(){
     div.innerHTML=`
       <div class="flex items-start justify-between gap-3">
         <div class="min-w-0">
-          <div class="font-medium">${e.item.name} ｜ 醬汁：${e.sauce} ｜ 主食：${e.staple}</div>
+          <div class="font-medium">${e.item.name} ｜ 醬汁：${e.sauce} ｜ 副食：${e.staple}</div>
           <div class="text-sm text-slate-700 mt-1">加點：${addonText}</div>
           <div class="text-sm text-slate-600 mt-1">
             數量 ×
