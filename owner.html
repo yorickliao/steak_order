@@ -13,6 +13,27 @@
     th,td{border-bottom:1px solid #e2e8f0;padding:.6rem .75rem;vertical-align:top}
     th{background:#f8fafc;text-align:left;font-weight:600}
     .mono{font-variant-numeric:tabular-nums}
+
+    /* 完成打勾按鈕樣式 */
+    .chkbtn{
+      display:inline-flex;align-items:center;gap:.5rem;
+      border:1px solid #cbd5e1;border-radius:.75rem;background:#fff;
+      padding:.35rem .6rem;line-height:1;color:#0f172a;
+      transition:.15s ease;
+    }
+    .chkbtn:hover{background:#f8fafc}
+    .chkbtn .box{
+      width:22px;height:22px;border-radius:.5rem;
+      border:1.5px solid #94a3b8;display:grid;place-items:center;
+      background:#fff;color:#fff;transition:.15s ease;
+    }
+    .chkbtn svg{width:14px;height:14px;opacity:0;transition:.15s ease}
+    .chkbtn.is-checked .box{
+      background:linear-gradient(180deg,#a5b4fc 0%, #60a5fa 100%);
+      border-color:transparent;color:#fff;
+    }
+    .chkbtn.is-checked svg{opacity:1}
+    .row-done{opacity:.5}
   </style>
 </head>
 <body class="bg-slate-50 text-slate-900">
@@ -53,16 +74,11 @@
     <!-- 控制列卡 -->
     <div id="controlsCard" class="card bg-white p-5 mb-5 hidden">
       <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-        <!-- 把搜尋移到「今天」旁邊 -->
         <div class="flex items-center gap-3 flex-wrap">
           <label class="text-sm text-slate-600">查詢日期</label>
           <input id="datePicker" type="date" class="rounded-xl border border-slate-300 px-3 py-2">
           <button id="btnToday" class="btn px-3 py-2 border border-slate-300 hover:bg-slate-100">今天</button>
-
-          <!-- 分隔線（大螢幕出現） -->
           <span class="hidden md:inline-block w-px h-6 bg-slate-200"></span>
-
-          <!-- 搜尋框（新位置） -->
           <input id="q" type="search" placeholder="搜尋 姓名/電話/品項/#號碼"
                  class="rounded-xl border border-slate-300 px-3 py-2 w-full md:w-80" />
         </div>
@@ -224,15 +240,18 @@ function renderTable(){
   ORDERS.forEach(o=>{
     const done = isTrue(o.done);
     const tr = document.createElement('tr');
-    if (done) tr.classList.add('opacity-50');
+    if (done) tr.classList.add('row-done');
 
+    // 品項：一行一個
     let itemsHtml = '';
     if (o.items) {
-      // 以換行為主，向後相容「、」
       const text = String(o.items || '').replace(/\r\n/g,'\n').replace(/\r/g,'\n').replace(/、/g,'\n');
       const lines = text.split('\n').map(s => s.trim()).filter(Boolean);
       itemsHtml = lines.map(line => `<div>${line}</div>`).join('');
     }
+
+    const checkedClass = done ? 'is-checked' : '';
+    const next = done ? 0 : 1;
 
     tr.innerHTML = `
       <td class="mono">#${o.pickupNo || ''}</td>
@@ -244,27 +263,40 @@ function renderTable(){
       <td style="min-width:260px">${itemsHtml}</td>
       <td class="mono text-right">${fmtMoney(o.total||0)}</td>
       <td class="text-right md:text-left">
-        <button class="btnDone btn px-3 py-1 border border-slate-300 hover:bg-slate-100 text-sm"
-                data-id="${o.id}" data-next="${done?0:1}">
-          ${done ? '復原' : '完成'}
+        <button class="chkbtn ${checkedClass}" aria-pressed="${done?'true':'false'}"
+                data-id="${o.id}" data-next="${next}">
+          <span class="box">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+          </span>
+          <span>${done ? '已完成' : '完成'}</span>
         </button>
       </td>
     `;
-    const btn = tr.querySelector('.btnDone');
-    btn.addEventListener('click', async (ev)=>{
-      const id = ev.currentTarget.dataset.id;
-      const next = ev.currentTarget.dataset.next === '1';
-      ev.currentTarget.disabled = true;
+
+    // 綁定切換完成
+    tr.querySelector('.chkbtn').addEventListener('click', async (ev)=>{
+      const btn = ev.currentTarget;
+      const id = btn.dataset.id;
+      const nextVal = btn.dataset.next === '1';
+      btn.disabled = true;
       try{
-        await apiSetDone(id, next);
+        await apiSetDone(id, nextVal);
+        // 更新本地資料
         const iAll = ORDERS_ALL.findIndex(x => x.id === id);
-        if (iAll >= 0) ORDERS_ALL[iAll].done = next ? '1' : '0';
-        applyFilters();
-        renderTable();
+        if (iAll >= 0) ORDERS_ALL[iAll].done = nextVal ? '1' : '0';
+        // 即時更新按鈕與列樣式
+        btn.dataset.next = nextVal ? '0' : '1';
+        btn.classList.toggle('is-checked', nextVal);
+        btn.setAttribute('aria-pressed', nextVal ? 'true' : 'false');
+        btn.querySelector('span:last-child').textContent = nextVal ? '已完成' : '完成';
+        tr.classList.toggle('row-done', nextVal);
       }catch(e){
         alert('更新失敗：' + e.message);
       }finally{
-        ev.currentTarget.disabled = false;
+        btn.disabled = false;
       }
     });
 
