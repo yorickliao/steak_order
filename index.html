@@ -315,7 +315,7 @@ function renderCart(){
     div.innerHTML=`
       <div class="flex items-start justify-between gap-3">
         <div class="min-w-0">
-          <div class="font-medium">${e.item.name} ｜ 醬汁：${e.sauce} ｜ 主食：${e.staple}</div>
+          <div class="font-medium">${e.item.name} ｜ 醬汁：${e.sauce} ｜ 副食：${e.staple}</div>
           <div class="text-sm text-slate-700 mt-1">加點：${addonText}</div>
           <div class="text-sm text-slate-600 mt-1">
             數量 ×
@@ -364,7 +364,7 @@ async function onSubmitOrder(e){
     // 組訂單品項（名稱含選項與加點）
     const items = state.cart.map(e=>{
       const addonText = (e.addons||[]).length ? '｜加點：'+e.addons.map(a=>a.id).join('、') : '';
-      const nameWith = `${e.item.name}｜醬汁：${e.sauce}｜主食：${e.staple}${addonText}`;
+      const nameWith = `${e.item.name}｜醬汁：${e.sauce}｜副食：${e.staple}${addonText}`;
       const unitPrice = e.item.price + (e.addons||[]).reduce((s,a)=> s+a.price, 0);
       return { id:e.item.id, name:nameWith, price:unitPrice, qty:e.qty };
     });
