@@ -36,6 +36,7 @@
           最近同步：<span id="lastSync" class="font-medium">--</span>
         </div>
       </div>
+    </div>
   </header>
 
   <main class="mx-auto container-slim px-4 py-6">
@@ -89,17 +90,17 @@
               <th>取餐時間</th>
               <th>品項</th>
               <th class="text-right">金額</th>
+              <th>完成</th>
             </tr>
           </thead>
           <tbody id="tbody"></tbody>
         </table>
       </div>
-      <!-- 原本表格下方的搜尋列已移除 -->
     </div>
   </main>
 
 <script>
-const ENDPOINT = 'https://script.google.com/macros/s/AKfycbySoN480O_ztltgXjW7wibq3itxlb_YCp2YyZgnHIhE7JrVt0_TKw7dzRatLTxQqbPM/exec';
+const ENDPOINT = 'https://script.google.com/macros/s/AKfycbxue6uf9lfljLbXnaGDsWuAkvnxvmGCTP3A3ZXj4ayyc2h1dIyMKp6pYlq7S7RJBSl2/exec';
 const FRONTEND_PASSWORD = "steak";
 
 const el = s => document.querySelector(s);
@@ -133,18 +134,18 @@ function rowMatchesDate(order, yyyy_mm_dd){
   const norm = `${dm[1]}-${dm[2]}-${dm[3]}`;
   return norm === yyyy_mm_dd;
 }
-
 function setLastSync(){
   lastSync = nowTime();
-  el('#lastSync').textContent = lastSync;
+  const lastSyncEl = el('#lastSync');
+  if (lastSyncEl) lastSyncEl.textContent = lastSync;
 }
-
 function updateStatusPill(){
   const pill = el('#statusPill');
   pill.textContent = paused ? '暫停接單' : '接受中';
   pill.className = 'px-3 py-1 rounded-full text-sm font-medium ' + (paused ? 'bg-slate-200 text-slate-700' : 'bg-green-100 text-green-700');
   el('#togglePauseHeader').textContent = paused ? '恢復接單' : '暫停接單';
 }
+function isTrue(v){ return v===true || v===1 || v==='1' || String(v).toLowerCase()==='true'; }
 
 async function getStatus(){
   const url = `${ENDPOINT}?action=status&_=${Date.now()}`;
@@ -168,6 +169,16 @@ async function setPause(next){
   if (!d.ok) throw new Error(d.error || 'set_pause_failed');
   paused = !!d.paused;
   updateStatusPill();
+}
+
+async function apiSetDone(id, next){
+  const payload = { action:'set_done', adminKey: FRONTEND_PASSWORD, id, value: next ? 1 : 0 };
+  const r = await fetch(ENDPOINT, { method:'POST', body: JSON.stringify(payload) });
+  const t = await r.text();
+  let d;
+  try { d = JSON.parse(t); } catch { throw new Error('回應格式錯誤'); }
+  if (!d.ok) throw new Error(d.error || 'set_done_failed');
+  return d;
 }
 
 async function loadOrders(){
@@ -211,15 +222,15 @@ function renderTable(){
   const tb = el('#tbody'); 
   tb.innerHTML='';
   ORDERS.forEach(o=>{
+    const done = isTrue(o.done);
     const tr = document.createElement('tr');
+    if (done) tr.classList.add('opacity-50');
 
     let itemsHtml = '';
     if (o.items) {
-      // 先把全形頓號「、」換成換行，再 split
-      const lines = o.items.replace(/、/g, '\n')
-                           .split(/\n/)
-                           .map(s => s.trim())
-                           .filter(s => s);
+      // 以換行為主，向後相容「、」
+      const text = String(o.items || '').replace(/\r\n/g,'\n').replace(/\r/g,'\n').replace(/、/g,'\n');
+      const lines = text.split('\n').map(s => s.trim()).filter(Boolean);
       itemsHtml = lines.map(line => `<div>${line}</div>`).join('');
     }
 
@@ -232,12 +243,34 @@ function renderTable(){
       <td class="mono">${onlyHHmm(o.pickupTime)}</td>
       <td style="min-width:260px">${itemsHtml}</td>
       <td class="mono text-right">${fmtMoney(o.total||0)}</td>
+      <td class="text-right md:text-left">
+        <button class="btnDone btn px-3 py-1 border border-slate-300 hover:bg-slate-100 text-sm"
+                data-id="${o.id}" data-next="${done?0:1}">
+          ${done ? '復原' : '完成'}
+        </button>
+      </td>
     `;
+    const btn = tr.querySelector('.btnDone');
+    btn.addEventListener('click', async (ev)=>{
+      const id = ev.currentTarget.dataset.id;
+      const next = ev.currentTarget.dataset.next === '1';
+      ev.currentTarget.disabled = true;
+      try{
+        await apiSetDone(id, next);
+        const iAll = ORDERS_ALL.findIndex(x => x.id === id);
+        if (iAll >= 0) ORDERS_ALL[iAll].done = next ? '1' : '0';
+        applyFilters();
+        renderTable();
+      }catch(e){
+        alert('更新失敗：' + e.message);
+      }finally{
+        ev.currentTarget.disabled = false;
+      }
+    });
+
     tb.appendChild(tr);
   });
 }
-
-
 
 function startAutoRefresh(){
   stopAutoRefresh();
