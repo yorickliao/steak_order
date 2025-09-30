@@ -52,6 +52,10 @@
       <h2 class="text-lg font-semibold">超值雙拼</h2>
       <div id="comboList" class="grid grid-cols-2 gap-4"></div>
     </div>
+    <div class="space-y-3">
+      <h2 class="text-lg font-semibold">單點副食</h2>
+      <div id="sidesList" class="grid grid-cols-2 gap-4"></div>
+    </div>
   </section>
 
   <aside id="cart"
@@ -196,6 +200,11 @@ const MENU = {
     { id:"牛小排+鮭魚",   name:"牛小排+鮭魚",   price:360 },
     { id:"厚菲力+厚板腱", name:"厚菲力+厚板腱", price:360 },
     { id:"松板豬+魷魚",   name:"松板豬+魷魚",   price:370 },
+  ],
+  sides: [
+    { id:"鐵板麵", name:"鐵板麵", price:80 },
+    { id:"鐵板飯", name:"鐵板飯", price:80 },
+    { id:"鐵板通心麵", name:"鐵板通心麵", price:80 },
   ],
 };
 
@@ -427,6 +436,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   renderCategory(MENU.chicken,'#chickenList');
   renderCategory(MENU.seafood,'#seafoodList');
   renderCategory(MENU.combo,'#comboList');
+  renderCategory(MENU.sides,'#sidesList');
   renderCart();
   el('#clearCart').addEventListener('click',()=>{state.cart=[];renderCart();});
   el('#checkoutForm').addEventListener('submit',onSubmitOrder);
