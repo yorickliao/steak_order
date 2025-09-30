@@ -87,7 +87,7 @@
   </aside>
 </main>
 
-<!-- 公告視窗（新增） -->
+<!-- 公告視窗 -->
 <div id="noticeModal" class="fixed inset-0 z-50 hidden">
   <div class="absolute inset-0 bg-black/40"></div>
   <div class="relative z-10 mx-auto mt-20 w-[92%] max-w-xl card bg-white p-6">
@@ -152,7 +152,7 @@ const ADDONS  = [
   { id:"加培根", price:40 }
 ];
 
-/* === 菜單（依你提供） === */
+/* === 菜單 === */
 const MENU = {
   pork: [
     { id:"嚴選豬排",       name:"嚴選豬排",       price:150 },
@@ -218,7 +218,7 @@ function renderCategory(list, targetId){
   });
 }
 
-/* === Modal（選醬汁 / 主食 / 加點（勾選） / 數量） === */
+/* === Modal（選醬汁 / 主食 / 加點 / 數量 / 備註） === */
 let currentItem = null;
 function openItemModal(item){
   currentItem = item;
@@ -248,6 +248,10 @@ function openItemModal(item){
     ex.appendChild(row);
   });
 
+  // 備註（本品項）
+  const pmRemark = el('#pmRemark');
+  if (pmRemark) pmRemark.value = '';
+
   // 數量初始與小計
   const qtyInput = el('#pmQty');
   qtyInput.value = 1;
@@ -266,11 +270,12 @@ function openItemModal(item){
     const qty = Math.max(1, parseInt(qtyInput.value)||1);
     const sauce = el('#pmSauce').value;
     const staple = el('#pmStaple').value;
+    const remark = (el('#pmRemark')?.value || '').trim();
     const selectedAddons = [];
     el('#pmAddons').querySelectorAll('.addonChk').forEach((chk, i)=>{
       if(chk.checked) selectedAddons.push(ADDONS[i]);
     });
-    addToCart({ item: currentItem, sauce, staple, addons: selectedAddons, qty });
+    addToCart({ item: currentItem, sauce, staple, addons: selectedAddons, qty, remark });
   };
 
   el('#itemModal').classList.remove('hidden');
@@ -317,6 +322,7 @@ function renderCart(){
         <div class="min-w-0">
           <div class="font-medium">${e.item.name} ｜ 醬汁：${e.sauce} ｜ 副食：${e.staple}</div>
           <div class="text-sm text-slate-700 mt-1">加點：${addonText}</div>
+          <div class="text-sm text-slate-700 mt-1">備註：${e.remark ? e.remark : '(無)'}</div>
           <div class="text-sm text-slate-600 mt-1">
             數量 ×
             <input type="number" min="1" value="${e.qty}" class="lineQty w-16 text-center border border-slate-300 rounded-lg py-1 mx-1 bg-white text-slate-900">
@@ -361,10 +367,11 @@ async function onSubmitOrder(e){
     const phone=el('#customerPhone').value.trim();
     if(!name||!phone){ showErr('請完整填寫姓名與電話。'); return; }
 
-    // 組訂單品項（名稱含選項與加點）
+    // 組訂單品項（名稱含選項、加點、備註）
     const items = state.cart.map(e=>{
       const addonText = (e.addons||[]).length ? '｜加點：'+e.addons.map(a=>a.id).join('、') : '';
-      const nameWith = `${e.item.name}｜醬汁：${e.sauce}｜副食：${e.staple}${addonText}`;
+      const remarkPart = '｜備註：' + (e.remark || '');
+      const nameWith = `${e.item.name}｜醬汁：${e.sauce}｜副食：${e.staple}${addonText}${remarkPart}`;
       const unitPrice = e.item.price + (e.addons||[]).reduce((s,a)=> s+a.price, 0);
       return { id:e.item.id, name:nameWith, price:unitPrice, qty:e.qty };
     });
@@ -402,7 +409,7 @@ async function onSubmitOrder(e){
   }finally{ setBusy(false); }
 }
 
-/* === 公告視窗控制（新增） === */
+/* === 公告視窗控制 === */
 function openNotice(){
   document.body.classList.add('overflow-hidden');
   el('#noticeModal').classList.remove('hidden');
@@ -457,6 +464,14 @@ document.addEventListener('DOMContentLoaded',()=>{
       <div class="mt-5">
         <label class="text-sm text-slate-600">加點</label>
         <div id="pmAddons" class="mt-2 grid grid-cols-1 md:grid-cols-2 gap-3"></div>
+      </div>
+
+      <!-- 新增：備註（本品項） -->
+      <div class="mt-5">
+        <label class="text-sm text-slate-600">備註（本品項，選填）</label>
+        <textarea id="pmRemark" rows="2"
+          class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 bg-white text-slate-900"
+          placeholder="例如：不要香菜、醬汁分開裝"></textarea>
       </div>
 
       <div class="mt-5">
