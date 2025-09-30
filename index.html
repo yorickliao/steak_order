@@ -152,7 +152,7 @@ const STAPLES = ["牛排麵條","通心麵","飯","麵換蛋"];
 const ADDONS  = [
   { id:"加飯", price:10 },
   { id:"加麵", price:10 },
-  { id:"加蛋",   price:15 },
+  { id:"加蛋", price:15 },
   { id:"加培根", price:40 }
 ];
 
@@ -202,9 +202,9 @@ const MENU = {
     { id:"松板豬+魷魚",   name:"松板豬+魷魚",   price:370 },
   ],
   sides: [
-    { id:"鐵板麵", name:"鐵板麵", price:80 },
-    { id:"鐵板飯", name:"鐵板飯", price:80 },
-    { id:"鐵板通心麵", name:"鐵板通心麵", price:80 },
+    { id:"鐵板麵",     name:"鐵板麵",     price:80, noStaple:true },
+    { id:"鐵板飯",     name:"鐵板飯",     price:80, noStaple:true },
+    { id:"鐵板通心麵", name:"鐵板通心麵", price:80, noStaple:true },
   ],
 };
 
@@ -238,9 +238,15 @@ function openItemModal(item){
   const sauceSel = el('#pmSauce'); sauceSel.innerHTML='';
   SAUCES.forEach(s=>{ const o=document.createElement('option'); o.value=s; o.textContent=s; sauceSel.appendChild(o); });
 
-  // 主食
-  const stapleSel = el('#pmStaple'); stapleSel.innerHTML='';
-  STAPLES.forEach(s=>{ const o=document.createElement('option'); o.value=s; o.textContent=s; stapleSel.appendChild(o); });
+  // 主食（可隱藏）
+  const stapleWrap = el('#pmStapleWrap');
+  const stapleSel  = el('#pmStaple');
+  if (stapleSel) stapleSel.innerHTML='';
+  const isNoStaple = !!item.noStaple;
+  if (stapleWrap) stapleWrap.style.display = isNoStaple ? 'none' : '';
+  if (!isNoStaple) {
+    STAPLES.forEach(s=>{ const o=document.createElement('option'); o.value=s; o.textContent=s; stapleSel.appendChild(o); });
+  }
 
   // 加點（checkbox）
   const ex = el('#pmAddons'); ex.innerHTML='';
@@ -271,20 +277,20 @@ function openItemModal(item){
   qtyInput.oninput = updatePmSubtotal;
 
   el('#pmAddons').onchange = updatePmSubtotal;
-  el('#pmSauce').onchange = updatePmSubtotal;
-  el('#pmStaple').onchange = updatePmSubtotal;
+  el('#pmSauce').onchange  = updatePmSubtotal;
+  if (!isNoStaple) el('#pmStaple').onchange = updatePmSubtotal;
 
   // 加入購物車
   el('#pmAdd').onclick = ()=>{
-    const qty = Math.max(1, parseInt(qtyInput.value)||1);
-    const sauce = el('#pmSauce').value;
-    const staple = el('#pmStaple').value;
+    const qty    = Math.max(1, parseInt(qtyInput.value)||1);
+    const sauce  = el('#pmSauce').value;
+    const staple = isNoStaple ? '' : el('#pmStaple').value;
     const remark = (el('#pmRemark')?.value || '').trim();
     const selectedAddons = [];
     el('#pmAddons').querySelectorAll('.addonChk').forEach((chk, i)=>{
       if(chk.checked) selectedAddons.push(ADDONS[i]);
     });
-    addToCart({ item: currentItem, sauce, staple, addons: selectedAddons, qty, remark });
+    addToCart({ item: currentItem, sauce, staple, addons: selectedAddons, qty, remark, noStaple: isNoStaple });
   };
 
   el('#itemModal').classList.remove('hidden');
@@ -329,7 +335,9 @@ function renderCart(){
     div.innerHTML=`
       <div class="flex items-start justify-between gap-3">
         <div class="min-w-0">
-          <div class="font-medium">${e.item.name} ｜ 醬汁：${e.sauce} ｜ 副食：${e.staple}</div>
+          <div class="font-medium">
+            ${e.item.name} ｜ 醬汁：${e.sauce}${e.noStaple ? '' : ` ｜ 副食：${e.staple}`}
+          </div>
           <div class="text-sm text-slate-700 mt-1">加點：${addonText}</div>
           <div class="text-sm text-slate-700 mt-1">備註：${e.remark ? e.remark : '(無)'}</div>
           <div class="text-sm text-slate-600 mt-1">
@@ -376,12 +384,13 @@ async function onSubmitOrder(e){
     const phone=el('#customerPhone').value.trim();
     if(!name||!phone){ showErr('請完整填寫姓名與電話。'); return; }
 
-    // 組訂單品項（名稱含選項、加點、備註）
+    // 組訂單品項（名稱含選項、加點、備註；單點副食不拼副食）
     const items = state.cart.map(e=>{
-      const addonText = (e.addons||[]).length ? '｜加點：'+e.addons.map(a=>a.id).join('、') : '';
+      const addonText  = (e.addons||[]).length ? '｜加點：'+e.addons.map(a=>a.id).join('、') : '';
+      const staplePart = e.noStaple ? '' : `｜副食：${e.staple}`;
       const remarkPart = '｜備註：' + (e.remark || '');
-      const nameWith = `${e.item.name}｜醬汁：${e.sauce}｜副食：${e.staple}${addonText}${remarkPart}`;
-      const unitPrice = e.item.price + (e.addons||[]).reduce((s,a)=> s+a.price, 0);
+      const nameWith   = `${e.item.name}｜醬汁：${e.sauce}${staplePart}${addonText}${remarkPart}`;
+      const unitPrice  = e.item.price + (e.addons||[]).reduce((s,a)=> s+a.price, 0);
       return { id:e.item.id, name:nameWith, price:unitPrice, qty:e.qty };
     });
     const subtotal = items.reduce((s,it)=> s + it.price*it.qty, 0);
@@ -465,7 +474,7 @@ document.addEventListener('DOMContentLoaded',()=>{
           <label class="text-sm text-slate-600">醬汁</label>
           <select id="pmSauce" class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 bg-white text-slate-900"></select>
         </div>
-        <div>
+        <div id="pmStapleWrap">
           <label class="text-sm text-slate-600">副食</label>
           <select id="pmStaple" class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 bg-white text-slate-900"></select>
         </div>
@@ -476,7 +485,6 @@ document.addEventListener('DOMContentLoaded',()=>{
         <div id="pmAddons" class="mt-2 grid grid-cols-1 md:grid-cols-2 gap-3"></div>
       </div>
 
-      <!-- 新增：備註（本品項） -->
       <div class="mt-5">
         <label class="text-sm text-slate-600">備註（本品項，選填）</label>
         <textarea id="pmRemark" rows="2"
