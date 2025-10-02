@@ -61,16 +61,6 @@
   </header>
 
   <main class="mx-auto container-slim px-4 py-6">
-    <!-- 登入卡 -->
-    <div id="loginCard" class="card bg-white p-6 max-w-md mx-auto">
-      <h2 class="text-lg font-semibold mb-3">老闆登入</h2>
-      <form id="loginForm" class="space-y-3">
-        <input id="adminKey" type="password" class="w-full rounded-xl border border-slate-300 px-3 py-2" placeholder="請輸入密碼" required />
-        <button class="w-full btn px-4 py-2 bg-slate-900 text-white hover:bg-slate-800">登入</button>
-        <p id="loginErr" class="text-sm text-red-600"></p>
-      </form>
-    </div>
-
     <!-- 控制列卡 -->
     <div id="controlsCard" class="card bg-white p-5 mb-5 hidden">
       <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
@@ -316,24 +306,22 @@ function stopAutoRefresh(){
   if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null; }
 }
 
-el('#loginForm').addEventListener('submit', async (ev)=>{
-  ev.preventDefault();
-  const key = el('#adminKey').value.trim();
-  if(key !== FRONTEND_PASSWORD){
-    el('#loginErr').textContent = '密碼錯誤';
-    return;
-  }
-  el('#loginCard').classList.add('hidden');
+/* ====== 新增：進頁即初始化（無登入卡） ====== */
+(async function init(){
+  // 顯示控制列與清單
   el('#controlsCard').classList.remove('hidden');
   el('#listCard').classList.remove('hidden');
 
+  // 預設查詢日期：今天
   el('#datePicker').value = todayLocal();
 
+  // 載入訂單與狀態、啟動自動刷新
   await Promise.all([loadOrders(), getStatus()]);
   updateStatusPill();
   startAutoRefresh();
-});
+})();
 
+/* 其他互動 */
 el('#q').addEventListener('input', ()=>{ applyFilters(); renderTable(); });
 el('#datePicker').addEventListener('change', ()=>{ applyFilters(); renderTable(); });
 el('#btnReload').addEventListener('click', async ()=>{
