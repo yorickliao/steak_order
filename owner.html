@@ -75,7 +75,6 @@
 
         <div class="flex items-center gap-3 flex-wrap">
           <button id="btnReload" class="px-4 py-2 rounded-xl bg-slate-900 text-white hover:bg-slate-800">刷新</button>
-          <button id="flushNow" class="px-4 py-2 rounded-xl border border-slate-300 hover:bg-slate-100">立即同步</button>
           <label class="inline-flex items-center gap-2 text-sm text-slate-700">
             <input id="autoRefresh" type="checkbox" class="w-4 h-4" checked>
             自動每 15 秒更新
@@ -107,7 +106,7 @@
   </main>
 
 <script>
-const ENDPOINT = 'https://script.google.com/macros/s/AKfycbyYJBfzRLJFnsFr5amsGufke7U8EBHhD1bulo2xsCbNfCnBvJ4wM0IZeWKyCs4KrDrA/exec';
+const ENDPOINT = 'https://script.google.com/macros/s/AKfycbxue6uf9lfljLbXnaGDsWuAkvnxvmGCTP3A3ZXj4ayyc2h1dIyMKp6pYlq7S7RJBSl2/exec';
 const FRONTEND_PASSWORD = "steak";
 
 const el = s => document.querySelector(s);
@@ -153,8 +152,6 @@ function updateStatusPill(){
   el('#togglePauseHeader').textContent = paused ? '恢復接單' : '暫停接單';
 }
 function isTrue(v){ return v===true || v===1 || v==='1' || String(v).toLowerCase()==='true'; }
-function hasTransient(list){ return (list||[]).some(o => o && o.transient); }
-function transientCount(list){ return (list||[]).filter(o => o && o.transient).length; }
 
 async function getStatus(){
   const url = `${ENDPOINT}?action=status&_=${Date.now()}`;
@@ -190,24 +187,6 @@ async function apiSetDone(id, next){
   return d;
 }
 
-async function flushNow(){
-  const btn = el('#flushNow');
-  btn.disabled = true;
-  btn.textContent = '同步中…';
-  try{
-    await fetch(ENDPOINT, {
-      method: 'POST',
-      body: JSON.stringify({ action:'flush', adminKey: FRONTEND_PASSWORD })
-    });
-    await loadOrders();
-  }catch(e){
-    alert('同步失敗：' + e.message);
-  }finally{
-    btn.disabled = false;
-    btn.textContent = '立即同步';
-  }
-}
-
 async function loadOrders(){
   if (isLoading) return;
   isLoading = true;
@@ -223,9 +202,7 @@ async function loadOrders(){
     applyFilters();
     renderTable();
     setLastSync();
-
-    const tCnt = transientCount(ORDERS_ALL);
-    el('#meta').textContent = `共 ${ORDERS.length} 筆　未落地：${tCnt} 筆　最後更新：${lastSync}`;
+    el('#meta').textContent = `共 ${ORDERS.length} 筆　最後更新：${lastSync}`;
   } catch (e) {
     el('#meta').textContent = '載入失敗：' + e.message;
   } finally {
@@ -252,7 +229,6 @@ function renderTable(){
   tb.innerHTML='';
   ORDERS.forEach(o=>{
     const done = isTrue(o.done);
-    const isTransient = !!o.transient;
     const tr = document.createElement('tr');
     if (done) tr.classList.add('row-done');
 
@@ -268,10 +244,7 @@ function renderTable(){
     const next = done ? 0 : 1;
 
     tr.innerHTML = `
-      <td class="mono">
-        #${o.pickupNo || ''}
-        ${isTransient ? '<span class="ml-2 px-2 py-0.5 rounded-full text-xs bg-amber-100 text-amber-700">未落地</span>' : ''}
-      </td>
+      <td class="mono">#${o.pickupNo || ''}</td>
       <td>
         <div class="font-medium">${o.name || ''}</div>
         <div class="text-slate-500 text-sm mono">${o.phone || ''}</div>
@@ -281,7 +254,7 @@ function renderTable(){
       <td class="mono text-right">${fmtMoney(o.total||0)}</td>
       <td class="text-right md:text-left">
         <button class="chkbtn ${checkedClass}" aria-pressed="${done?'true':'false'}"
-                data-id="${o.id}" data-next="${next}" ${isTransient ? 'disabled title="尚未寫入表格，請先同步"' : ''}>
+                data-id="${o.id}" data-next="${next}">
           <span class="box">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
                  stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
@@ -293,32 +266,29 @@ function renderTable(){
       </td>
     `;
 
-    // 綁定切換完成（未落地的列已 disabled，不會觸發）
-    const toggleBtn = tr.querySelector('.chkbtn');
-    if (toggleBtn && !isTransient) {
-      toggleBtn.addEventListener('click', async (ev)=>{
-        const btn = ev.currentTarget;
-        const id = btn.dataset.id;
-        const nextVal = btn.dataset.next === '1';
-        btn.disabled = true;
-        try{
-          await apiSetDone(id, nextVal);
-          // 更新本地資料
-          const iAll = ORDERS_ALL.findIndex(x => x.id === id);
-          if (iAll >= 0) ORDERS_ALL[iAll].done = nextVal ? '1' : '0';
-          // 即時更新按鈕與列樣式
-          btn.dataset.next = nextVal ? '0' : '1';
-          btn.classList.toggle('is-checked', nextVal);
-          btn.setAttribute('aria-pressed', nextVal ? 'true' : 'false');
-          btn.querySelector('span:last-child').textContent = nextVal ? '已完成' : '完成';
-          tr.classList.toggle('row-done', nextVal);
-        }catch(e){
-          alert('更新失敗：' + e.message);
-        }finally{
-          btn.disabled = false;
-        }
-      });
-    }
+    // 綁定切換完成
+    tr.querySelector('.chkbtn').addEventListener('click', async (ev)=>{
+      const btn = ev.currentTarget;
+      const id = btn.dataset.id;
+      const nextVal = btn.dataset.next === '1';
+      btn.disabled = true;
+      try{
+        await apiSetDone(id, nextVal);
+        // 更新本地資料
+        const iAll = ORDERS_ALL.findIndex(x => x.id === id);
+        if (iAll >= 0) ORDERS_ALL[iAll].done = nextVal ? '1' : '0';
+        // 即時更新按鈕與列樣式
+        btn.dataset.next = nextVal ? '0' : '1';
+        btn.classList.toggle('is-checked', nextVal);
+        btn.setAttribute('aria-pressed', nextVal ? 'true' : 'false');
+        btn.querySelector('span:last-child').textContent = nextVal ? '已完成' : '完成';
+        tr.classList.toggle('row-done', nextVal);
+      }catch(e){
+        alert('更新失敗：' + e.message);
+      }finally{
+        btn.disabled = false;
+      }
+    });
 
     tb.appendChild(tr);
   });
@@ -336,12 +306,16 @@ function stopAutoRefresh(){
   if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null; }
 }
 
-/* ====== 初始化 ====== */
+/* ====== 新增：進頁即初始化（無登入卡） ====== */
 (async function init(){
+  // 顯示控制列與清單
   el('#controlsCard').classList.remove('hidden');
   el('#listCard').classList.remove('hidden');
+
+  // 預設查詢日期：今天
   el('#datePicker').value = todayLocal();
 
+  // 載入訂單與狀態、啟動自動刷新
   await Promise.all([loadOrders(), getStatus()]);
   updateStatusPill();
   startAutoRefresh();
@@ -350,16 +324,28 @@ function stopAutoRefresh(){
 /* 其他互動 */
 el('#q').addEventListener('input', ()=>{ applyFilters(); renderTable(); });
 el('#datePicker').addEventListener('change', ()=>{ applyFilters(); renderTable(); });
-el('#btnReload').addEventListener('click', async ()=>{ await Promise.all([loadOrders(), getStatus()]); });
-el('#btnToday').addEventListener('click', ()=>{ el('#datePicker').value = todayLocal(); applyFilters(); renderTable(); });
-el('#autoRefresh').addEventListener('change', (e)=>{ autoRefresh = !!e.target.checked; if (autoRefresh && !refreshTimer) startAutoRefresh(); });
+el('#btnReload').addEventListener('click', async ()=>{
+  await Promise.all([loadOrders(), getStatus()]);
+});
+el('#btnToday').addEventListener('click', ()=>{
+  el('#datePicker').value = todayLocal();
+  applyFilters();
+  renderTable();
+});
+el('#autoRefresh').addEventListener('change', (e)=>{
+  autoRefresh = !!e.target.checked;
+  if (autoRefresh && !refreshTimer) startAutoRefresh();
+});
 el('#togglePauseHeader').addEventListener('click', async ()=>{
   const btn = el('#togglePauseHeader');
   btn.disabled = true;
   try { await setPause(!paused); } catch(e) { alert('切換失敗：' + e.message); } finally { btn.disabled = false; }
 });
-el('#flushNow').addEventListener('click', flushNow);
-document.addEventListener('visibilitychange', async ()=>{ if (!document.hidden && refreshTimer) { await Promise.all([loadOrders(), getStatus()]); } });
+document.addEventListener('visibilitychange', async ()=>{
+  if (!document.hidden && refreshTimer) {
+    await Promise.all([loadOrders(), getStatus()]);
+  }
+});
 </script>
 </body>
 </html>
