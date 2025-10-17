@@ -134,7 +134,7 @@
 
 <script>
 /* === 只需改這兩個設定 === */
-const ENDPOINT = 'https://script.google.com/macros/s/AKfycbyhlVV0iRFVZGGwGP-03avd0d345iPump9Bs00k0JUT8_ioqXr2MQft-yEjxufW1DVz/exec';
+const ENDPOINT = 'https://script.google.com/macros/s/AKfycbxIdu3YVFvLAWa2nJTdkL2JcM8CirPc5jU6hy80BFNeHhxAxOUjY2QQLk5AYZZG3nrj/exec';
 const API_KEY  = 'steak';
 
 /* === 小工具 & 狀態 === */
@@ -395,7 +395,7 @@ async function onSubmitOrder(e){
     });
     const subtotal = items.reduce((s,it)=> s + it.price*it.qty, 0);
 
-    // 交由後端決定取餐時間
+    // 交由後端決定取餐時間（或前端選擇的 requestedPickup）
     const order={
       id:'O'+Date.now(),
       customer:{ name, phone },
@@ -407,9 +407,8 @@ async function onSubmitOrder(e){
     const resp=await apiCreate(order);
     if(!resp.ok){
       const friendly = resp.message
-        || (resp.error==='closed_day' ? '本店每週一、三公休，今日不接受訂單。'
-            : resp.error==='outside_hours' ? '目前非營業時間（營業時間 17:00–22:00），暫不接受訂單。'
-            : resp.error==='too_late_today' ? '今日已停止接單，請下次營業時間再下單。'
+        || (resp.error==='paused'        ? '目前已停止接單。'
+            : resp.error==='order_closed'? '目前非下單時段（可下單 00:00–22:00）。'
             : `送單失敗：${resp.error||'create_failed'}`);
       showErr(friendly);
       return;
@@ -457,9 +456,9 @@ document.addEventListener('DOMContentLoaded',()=>{
 });
 </script>
 
-<!-- 追加：自選取餐時段（17:00–22:00，每 15 分；不可早於現在；未選則自動+15） -->
+<!-- 追加：自選取餐時段（17:00–22:00，每 15 分；不可早於現在；未選則由系統安排下一個可取餐時間） -->
 <script>
-/* 營業參數 */
+/* 營業參數（取餐時段） */
 const SLOT_OPEN_HOUR  = 17;
 const SLOT_CLOSE_HOUR = 22;
 const SLOT_STEP_MIN   = 15;
@@ -513,9 +512,10 @@ function _buildTodaySlots(now){
     const prev = sel.value;
     sel.innerHTML = '';
 
+    // 自動選項（未選時，由後端自動排至下一個可取餐時間）
     const optAuto = document.createElement('option');
     optAuto.value = '';
-    optAuto.textContent = '自動（系統最快 +15 分鐘）';
+    optAuto.textContent = '自動（由系統安排下一個可取餐時間）';
     sel.appendChild(optAuto);
 
     let firstEnabled = '';
@@ -536,14 +536,16 @@ function _buildTodaySlots(now){
       sel.value = '';
     }
 
-    hint.textContent = firstEnabled ? `目前最早可選：${firstEnabled}` : '今日可選時段已結束';
+    hint.textContent = firstEnabled
+      ? `目前最早可選：${firstEnabled}`
+      : '今日可選時段已結束；未選時段照送出，系統會安排下一個可取餐時間（通常為下一個營業日 17:00）。';
   }
 
   refreshOptions();
   setInterval(refreshOptions, 60000);
 })();
 
-/* 包裝 apiCreate：若使用者選了時段，就一併帶上 requestedPickup */
+/* 包裝 apiCreate：若使用者選了時段，就一併帶上 requestedPickup（HH:mm） */
 (function wrapApiCreate(){
   if (typeof apiCreate !== 'function') return;
   const __orig = apiCreate;
@@ -595,7 +597,7 @@ function _buildTodaySlots(now){
 
       <div class="mt-5">
         <label class="text-sm text-slate-600">數量</label>
-        <div class="mt-1 flex items中心 gap-2">
+        <div class="mt-1 flex items-center gap-2">
           <button id="pmDec" class="btn px-3 py-2 border border-slate-300 hover:bg-slate-100">-</button>
           <input id="pmQty" type="number" min="1" value="1" class="w-20 text-center border border-slate-300 rounded-xl py-2 bg-white text-slate-900" />
           <button id="pmInc" class="btn px-3 py-2 border border-slate-300 hover:bg-slate-100">+</button>
