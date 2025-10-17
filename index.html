@@ -134,7 +134,7 @@
 
 <script>
 /* === 只需改這兩個設定 === */
-const ENDPOINT = 'https://script.google.com/macros/s/AKfycbxue6uf9lfljLbXnaGDsWuAkvnxvmGCTP3A3ZXj4ayyc2h1dIyMKp6pYlq7S7RJBSl2/exec';
+const ENDPOINT = 'https://script.google.com/macros/s/AKfycbyhlVV0iRFVZGGwGP-03avd0d345iPump9Bs00k0JUT8_ioqXr2MQft-yEjxufW1DVz/exec';
 const API_KEY  = 'steak';
 
 /* === 小工具 & 狀態 === */
@@ -457,6 +457,107 @@ document.addEventListener('DOMContentLoaded',()=>{
 });
 </script>
 
+<!-- 追加：自選取餐時段（17:00–22:00，每 15 分；不可早於現在；未選則自動+15） -->
+<script>
+/* 營業參數 */
+const SLOT_OPEN_HOUR  = 17;
+const SLOT_CLOSE_HOUR = 22;
+const SLOT_STEP_MIN   = 15;
+
+/* 工具 */
+const _pad2 = n => (n<10?'0':'')+n;
+const _fmtHHmm = d => `${_pad2(d.getHours())}:${_pad2(d.getMinutes())}`;
+function _ceilToNextStep(d, step=SLOT_STEP_MIN){
+  const out = new Date(d);
+  const m = out.getMinutes();
+  const floored = m - (m % step);
+  out.setMinutes(floored, 0, 0);
+  if (out.getTime() < d.getTime()) out.setMinutes(out.getMinutes() + step);
+  return out;
+}
+function _buildTodaySlots(now){
+  const start = new Date(now); start.setHours(SLOT_OPEN_HOUR, 0, 0, 0);
+  const last  = new Date(now); last.setHours(SLOT_CLOSE_HOUR-1, 45, 0, 0);
+  const slots = [];
+  for (let t=new Date(start); t<=last; t.setMinutes(t.getMinutes()+SLOT_STEP_MIN)) {
+    slots.push(new Date(t));
+  }
+  return slots;
+}
+
+/* 動態插入取餐時段欄位（不改動原有節點，只新增） */
+(function injectPickupField(){
+  const form = document.querySelector('#checkoutForm');
+  if (!form) return;
+  const submitBtn = form.querySelector('button[type="submit"]');
+  const holder = document.createElement('div');
+  holder.innerHTML = `
+    <div class="mt-2">
+      <label class="text-sm text-slate-600">取餐時段（選填）</label>
+      <select id="pickupSelect"
+              class="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 bg-white text-slate-900"></select>
+      <p id="pickupHint" class="text-xs text-slate-500 mt-1"></p>
+    </div>
+  `;
+  form.insertBefore(holder, submitBtn);
+
+  function refreshOptions(){
+    const sel  = document.querySelector('#pickupSelect');
+    const hint = document.querySelector('#pickupHint');
+    if (!sel) return;
+
+    const now = new Date();
+    const nextAllowed = _ceilToNextStep(now, SLOT_STEP_MIN);
+    const slots = _buildTodaySlots(now);
+
+    const prev = sel.value;
+    sel.innerHTML = '';
+
+    const optAuto = document.createElement('option');
+    optAuto.value = '';
+    optAuto.textContent = '自動（系統最快 +15 分鐘）';
+    sel.appendChild(optAuto);
+
+    let firstEnabled = '';
+    for (const s of slots) {
+      const o = document.createElement('option');
+      o.value = _fmtHHmm(s);
+      o.textContent = _fmtHHmm(s);
+      if (s.getTime() < nextAllowed.getTime()) {
+        o.disabled = true;
+        o.textContent += '（不可選）';
+      } else if (!firstEnabled) firstEnabled = _fmtHHmm(s);
+      sel.appendChild(o);
+    }
+
+    if ([...sel.options].some(op => op.value === prev && !op.disabled)) {
+      sel.value = prev;
+    } else {
+      sel.value = '';
+    }
+
+    hint.textContent = firstEnabled ? `目前最早可選：${firstEnabled}` : '今日可選時段已結束';
+  }
+
+  refreshOptions();
+  setInterval(refreshOptions, 60000);
+})();
+
+/* 包裝 apiCreate：若使用者選了時段，就一併帶上 requestedPickup */
+(function wrapApiCreate(){
+  if (typeof apiCreate !== 'function') return;
+  const __orig = apiCreate;
+  window.apiCreate = async function(order){
+    try{
+      const sel = document.querySelector('#pickupSelect');
+      const val = sel ? String(sel.value || '') : '';
+      if (val) order = { ...order, requestedPickup: val };
+    }catch(e){}
+    return __orig(order);
+  };
+})();
+</script>
+
 <!-- 選項彈窗 -->
 <div id="itemModal" class="fixed inset-0 z-40 hidden scroll-y">
   <div class="absolute inset-0 bg-black/40"></div>
@@ -494,7 +595,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 
       <div class="mt-5">
         <label class="text-sm text-slate-600">數量</label>
-        <div class="mt-1 flex items-center gap-2">
+        <div class="mt-1 flex items中心 gap-2">
           <button id="pmDec" class="btn px-3 py-2 border border-slate-300 hover:bg-slate-100">-</button>
           <input id="pmQty" type="number" min="1" value="1" class="w-20 text-center border border-slate-300 rounded-xl py-2 bg-white text-slate-900" />
           <button id="pmInc" class="btn px-3 py-2 border border-slate-300 hover:bg-slate-100">+</button>
