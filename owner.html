@@ -134,9 +134,9 @@ let autoRefresh = true;
 let lastSync = '--';
 
 /* ===== 新增：提示音相關狀態 ===== */
-let KNOWN_ORDER_IDS = new Set(); // 記錄已看過的訂單 id（試算表那欄 id）
-let firstLoad = true;            // 第一次載入不播提示音
-let soundEnabled = false;        // 是否已啟用提示音（按過按鈕）
+let LAST_SEEN_ID_NUM = null;   // 目前看過的最大 id 數字（例如 1758378983525）
+let firstLoad = true;          // 第一次載入不播提示音
+let soundEnabled = false;      // 是否已按下「啟用提示音」
 
 function fmtMoney(n){ return '$' + Number(n||0).toLocaleString('zh-Hant'); }
 function nowTime(){ const d=new Date(); return d.toLocaleString('zh-TW',{hour12:false}); }
@@ -251,7 +251,9 @@ async function loadOrders(){
   if (isLoading) return;
   isLoading = true;
   el('#meta').textContent = '載入中…';
+
   const url = `${ENDPOINT}?action=list&_=${Date.now()}`;
+
   try {
     const r = await fetch(url);
     const t = await r.text();
@@ -261,40 +263,60 @@ async function loadOrders(){
 
     const all = d.orders || [];
 
-    // ===== 新增：偵測新訂單（用試算表 id 欄位：o.id） =====
-    let hasNewOrder = false;
-    const nextKnown = new Set(KNOWN_ORDER_IDS);
+    // === 這裡開始：用「最大 id 數字」判斷有沒有新訂單 ===
+    // 從目前所有訂單裡找出「最大的 id 數字」
+    let latestNum = LAST_SEEN_ID_NUM;
 
     all.forEach(o => {
-      const id = o.id;
-      if (!id) return;
-      if (!KNOWN_ORDER_IDS.has(id)) {
-        if (!firstLoad) {
-          hasNewOrder = true;
+      if (!o.id) return;
+      // 把像 O1758378983525 這種 id 裡的數字抓出來
+      const num = parseInt(String(o.id).replace(/[^\d]/g, ''), 10);
+      if (!Number.isNaN(num)) {
+        if (latestNum === null || num > latestNum) {
+          latestNum = num;
         }
-        nextKnown.add(id);
       }
     });
 
-    KNOWN_ORDER_IDS = nextKnown;
-    ORDERS_ALL = all;
+    let shouldBeep = false;
 
+    // 不是第一次載入、已啟用提示音、而且這次看到的最大 id 比上次大 → 有新訂單
+    if (!firstLoad &&
+        soundEnabled &&
+        LAST_SEEN_ID_NUM !== null &&
+        latestNum !== null &&
+        latestNum > LAST_SEEN_ID_NUM) {
+      shouldBeep = true;
+    }
+
+    // 更新記錄的最大 id（第一次載入時會在這裡被設定）
+    if (latestNum !== null) {
+      LAST_SEEN_ID_NUM = latestNum;
+    }
+    // === 新訂單判斷到此為止 ===
+
+    // 原本的列表更新流程
+    ORDERS_ALL = all;
     applyFilters();
     renderTable();
     setLastSync();
     el('#meta').textContent = `共 ${ORDERS.length} 筆　最後更新：${lastSync}`;
 
-    if (hasNewOrder) {
+    // 如果有新訂單，播提示音
+    if (shouldBeep) {
       playNewOrderSound();
     }
 
+    // 記得把 firstLoad 改成 false，之後才會開始偵測
     firstLoad = false;
+
   } catch (e) {
     el('#meta').textContent = '載入失敗：' + e.message;
   } finally {
     isLoading = false;
   }
 }
+
 
 function applyFilters(){
   const qRaw = (el('#q').value || '').trim();
