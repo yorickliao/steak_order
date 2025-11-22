@@ -171,12 +171,14 @@ function isTrue(v){ return v===true || v===1 || v==='1' || String(v).toLowerCase
 /* ===== 新增：啟用提示音與播放提示音 ===== */
 function enableNewOrderSound() {
   const audio = el('#newOrderSound');
-  if (!audio) return;
+  if (!audio) {
+    alert('找不到 id=newOrderSound 的 audio 元素');
+    return;
+  }
 
+  // 直接播一次，讓你耳朵聽得到，也順便取得播放權限
+  audio.currentTime = 0;
   audio.play().then(() => {
-    // 立刻暫停，只是為了取得播放權限
-    audio.pause();
-    audio.currentTime = 0;
     soundEnabled = true;
 
     const btn = el('#enableSoundBtn');
@@ -187,10 +189,11 @@ function enableNewOrderSound() {
       btn.classList.add('border-slate-300','bg-slate-100','text-slate-600');
     }
   }).catch(err => {
-    alert('瀏覽器阻擋了自動播放，請再點一次「啟用提示音」按鈕或點擊畫面後再試。');
-    console.log(err);
+    alert('播放失敗：' + err.name + ' / ' + err.message);
+    console.log('enableNewOrderSound error:', err);
   });
 }
+
 
 function playNewOrderSound() {
   if (!soundEnabled) return;
@@ -202,6 +205,7 @@ function playNewOrderSound() {
     console.log('播放提示音失敗：', err);
   });
 }
+
 
 async function getStatus(){
   const url = `${ENDPOINT}?action=status&_=${Date.now()}`;
