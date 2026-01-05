@@ -100,8 +100,10 @@
       <li>僅限外帶！</li>
       <li>要內用勿點！</li>
       <li>取餐時間僅供參考，以現場作業為準！</li>
+      <li>不賣白飯！</li>
       <li>每週二,五,日，南科廠商21:30後，滿1500元可享外送服務！</li>
       <li>現場可以行動電子支付 （台灣pay, line pay, icash pay, 全支付, 街口支付）</li>
+      
     </ul>
     <div class="mt-5 flex justify-end gap-3">
       <button id="closeNotice" class="btn px-4 py-2 bg-slate-900 text-white hover:bg-slate-800">我知道了</button>
@@ -150,10 +152,10 @@ const onlyHHmm = (s) => {
 const SAUCES  = ["黑胡椒醬","蘑菇醬","綜合醬","蘑菇+玫瑰鹽","黑胡椒+玫瑰鹽","都不要醬+玫瑰鹽"];
 const STAPLES = ["牛排麵條",
                  "通心麵",
-                 // "飯",
+                 "飯",
                  "麵換蛋"];
 const ADDONS  = [
-  // { id:"加飯", price:10 },
+  { id:"加飯", price:10 },
   { id:"加麵", price:10 },
   { id:"加蛋", price:15 },
   { id:"加培根", price:40 }
@@ -230,7 +232,7 @@ const MENU = {
 
   sides: [
     { id:"鐵板麵",     name:"鐵板麵",     price:80, noStaple:true },
-    // { id:"鐵板飯",     name:"鐵板飯",     price:80, noStaple:true },
+    { id:"鐵板飯",     name:"鐵板飯",     price:80, noStaple:true },
     { id:"鐵板通心麵", name:"鐵板通心麵", price:80, noStaple:true },
   ],
 };
