@@ -49,7 +49,7 @@
       <div id="seafoodList" class="grid grid-cols-2 gap-4"></div>
     </div>
     <div class="space-y-3">
-      <h2 class="text-lg font-semibold">超值雙拼</h2>
+      <h2 class="text-lg font-semibold">雙拼排餐</h2>
       <div id="comboList" class="grid grid-cols-2 gap-4"></div>
     </div>
     <div class="space-y-3">
@@ -100,7 +100,7 @@
       <li>僅限外帶！</li>
       <li>要內用勿點！</li>
       <li>取餐時間僅供參考，以現場作業為準！</li>
-      <li>牛肉一律7分熟出餐</li>
+      <li>每週二,五,日，南科廠商21:30後，滿1500元可享外送服務！</li>
       <li>現場可以行動電子支付 （台灣pay, line pay, icash pay, 全支付, 街口支付）</li>
     </ul>
     <div class="mt-5 flex justify-end gap-3">
@@ -148,9 +148,12 @@ const onlyHHmm = (s) => {
 
 /* === 醬汁 / 主食 / 加點（勾選） === */
 const SAUCES  = ["黑胡椒醬","蘑菇醬","綜合醬","蘑菇+玫瑰鹽","黑胡椒+玫瑰鹽","都不要醬+玫瑰鹽"];
-const STAPLES = ["牛排麵條","通心麵","飯","麵換蛋"];
+const STAPLES = ["牛排麵條",
+                 "通心麵",
+                 // "飯",
+                 "麵換蛋"];
 const ADDONS  = [
-  { id:"加飯", price:10 },
+  // { id:"加飯", price:10 },
   { id:"加麵", price:10 },
   { id:"加蛋", price:15 },
   { id:"加培根", price:40 }
@@ -160,55 +163,74 @@ const ADDONS  = [
 const MENU = {
   pork: [
     { id:"嚴選豬排",       name:"嚴選豬排",       price:150 },
-    { id:"嚴選厚切豬排",   name:"嚴選厚切豬排",   price:190 },
-    { id:"厚切梅花豬排",   name:"厚切梅花豬排",   price:190 },
+    { id:"嚴選厚切豬排",   name:"嚴選厚切豬排",   price:200 },
+    { id:"厚切梅花豬排",   name:"厚切梅花豬排",   price:200 },
     { id:"香煎培根豬排",   name:"香煎培根豬排",   price:190 },
-    { id:"彈牙松板豬排",   name:"彈牙松板豬排",   price:210 },
+    { id:"彈牙松板豬排",   name:"彈牙松板豬排",   price:220 },
     { id:"香煎風味培根排", name:"香煎風味培根排", price:150 },
   ],
   beef: [
-    { id:"薄片沙朗牛排",       name:"薄片沙朗牛排",       price:150 },
+    { id:"薄片牛排",       name:"薄片牛排",              price:150 },
     { id:"香煎培根牛排",       name:"香煎培根牛排",       price:190 },
-    { id:"厚切沙朗牛排",       name:"厚切沙朗牛排",       price:190 },
-    { id:"厚切板腱牛排",       name:"厚切板腱牛排",       price:210 },
-    { id:"厚切無骨牛小排",     name:"厚切無骨牛小排",     price:210 },
-    { id:"厚切嫩肩菲力牛排",   name:"厚切嫩肩菲力牛排",   price:210 },
-    { id:"8盎司厚切翼板牛排",  name:"8盎司厚切翼板牛排",  price:320 },
-    { id:"16盎司厚切肩胛牛排", name:"16盎司厚切肩胛牛排", price:400 },
+    { id:"厚切沙朗牛排",       name:"厚切沙朗牛排",       price:210 },
+    { id:"厚切板腱牛排",       name:"厚切板腱牛排",       price:220 },
+    { id:"厚切無骨牛小排",     name:"厚切無骨牛小排",     price:220 },
+    { id:"厚切嫩肩牛排",   name:"厚切嫩肩牛排",          price:220 },
+    { id:"8盎司厚切翼板牛排",  name:"8盎司厚切翼板牛排",  price:350 },
+    { id:"16盎司厚切肩胛牛排", name:"16盎司厚切肩胛牛排", price:450 },
   ],
   chicken: [
-    { id:"香嫩雞胸排",     name:"香嫩雞胸排",     price:160 },
-    { id:"香煎培根雞胸排", name:"香煎培根雞胸排", price:200 },
+    { id:"香煎雞胸排",     name:"香煎雞胸排",     price:170 },
+    { id:"香煎培根雞胸排", name:"香煎培根雞胸排", price:210 },
     { id:"香煎雞腿排",     name:"香煎雞腿排",     price:160 },
-    { id:"香煎培根雞腿排", name:"香煎培根雞腿排", price:200 },
+    { id:"香煎培根雞腿排", name:"香煎培根雞腿排", price:210 },
   ],
   seafood: [
-    { id:"嫩鮭魚排", name:"嫩鮭魚排", price:210 },
+    { id:"鮮嫩鮭魚排", name:"鮮嫩鮭魚排", price:220 },
     { id:"阿根廷魷魚", name:"阿根廷魷魚", price:210 },
   ],
+  // combo: [
+  //   { id:"嚴選豬+薄片牛",  name:"嚴選豬+薄片牛", price:240 },
+  //   { id:"嚴選豬+香煎雞腿", name:"嚴選豬+香煎雞腿", price:260 },
+  //   { id:"豬+雞胸",       name:"豬+雞胸",       price:250 },
+  //   { id:"薄片牛+香煎雞胸",       name:"薄片牛+香煎雞胸",       price:260 },
+  //   { id:"薄片牛+香煎雞腿",       name:"薄片牛+香煎雞腿",       price:260 },
+  //   { id:"厚沙朗+嚴選豬",     name:"厚沙朗+嚴選豬",     price:300 },
+  //   { id:"梅花豬+雞腿",   name:"梅花豬+雞腿",   price:290 },
+  //   { id:"厚豬+雞腿",     name:"厚豬+雞腿",     price:290 },
+  //   { id:"魷魚+豬",       name:"魷魚+豬",       price:300 },
+  //   { id:"香煎雞腿+阿根廷魷魚",     name:"香煎雞腿+阿根廷魷魚",     price:330 },
+  //   { id:"厚沙朗+厚豬",   name:"厚沙朗+厚豬",   price:320 },
+  //   { id:"牛小排+鮭魚",   name:"牛小排+鮭魚",   price:360 },
+  //   { id:"厚菲力+厚板腱", name:"厚菲力+厚板腱", price:360 },
+  //   { id:"松板豬+魷魚",   name:"松板豬+魷魚",   price:370 },
+  //   { id:"豬排+雞腿",   name:"豬排+雞腿",   price:250 },
+  //   { id:"厚梅花豬+魷魚",   name:"厚梅花豬+魷魚",   price:340 },
+  //   { id:"厚梅花豬+厚切豬",   name:"厚梅花豬+厚切豬",   price:320 },
+  //   { id:"牛排+鮭魚",   name:"牛排+鮭魚",   price:300 },
+  //   { id:"嚴選豬+鮮嫩鮭魚",   name:"嚴選豬+鮮嫩鮭魚",   price:310 },
+  // ],
   combo: [
-    { id:"豬+牛",         name:"豬+牛",         price:240 },
-    { id:"豬+雞胸",       name:"豬+雞胸",       price:250 },
-    { id:"牛+雞胸",       name:"牛+雞胸",       price:250 },
-    { id:"牛+雞腿",       name:"牛+雞腿",       price:250 },
-    { id:"厚沙朗+豬",     name:"厚沙朗+豬",     price:280 },
-    { id:"梅花豬+雞腿",   name:"梅花豬+雞腿",   price:290 },
-    { id:"厚豬+雞腿",     name:"厚豬+雞腿",     price:290 },
-    { id:"魷魚+豬",       name:"魷魚+豬",       price:300 },
-    { id:"雞腿+魷魚",     name:"雞腿+魷魚",     price:310 },
-    { id:"厚沙朗+厚豬",   name:"厚沙朗+厚豬",   price:320 },
-    { id:"牛小排+鮭魚",   name:"牛小排+鮭魚",   price:360 },
-    { id:"厚菲力+厚板腱", name:"厚菲力+厚板腱", price:360 },
-    { id:"松板豬+魷魚",   name:"松板豬+魷魚",   price:370 },
-    { id:"豬排+雞腿",   name:"豬排+雞腿",   price:250 },
-    { id:"厚梅花豬+魷魚",   name:"厚梅花豬+魷魚",   price:340 },
-    { id:"厚梅花豬+厚切豬",   name:"厚梅花豬+厚切豬",   price:320 },
-    { id:"牛排+鮭魚",   name:"牛排+鮭魚",   price:300 },
-    { id:"豬排+鮭魚",   name:"豬排+鮭魚",   price:300 },
+    { id:"嚴選豬+薄片牛",         name:"嚴選豬+薄片牛",         price:240 },
+    { id:"嚴選豬+香煎雞腿",       name:"嚴選豬+香煎雞腿",       price:260 },
+    { id:"薄片牛+香煎雞腿",       name:"薄片牛+香煎雞腿",       price:260 },
+    { id:"薄片牛+香煎雞胸",       name:"薄片牛+香煎雞胸",       price:260 },
+    { id:"嚴選豬+厚切沙朗",       name:"嚴選豬+厚切沙朗",       price:300 },
+    { id:"嚴選豬+鮮嫩鮭魚",       name:"嚴選豬+鮮嫩鮭魚",       price:310 },
+    { id:"香煎雞腿+阿根廷魷魚",   name:"香煎雞腿+阿根廷魷魚",   price:330 },
+    { id:"松板豬+香煎雞腿",       name:"松板豬+香煎雞腿",       price:330 },
+    { id:"厚切豬+厚切板腱",       name:"厚切豬+厚切板腱",       price:360 },
+    { id:"厚切梅花+厚切嫩肩",     name:"厚切梅花+厚切嫩肩",     price:360 },
+    { id:"厚切梅花+阿根廷魷魚",   name:"厚切梅花+阿根廷魷魚",   price:360 },
+    { id:"厚切沙朗+厚切板腱",     name:"厚切沙朗+厚切板腱",     price:370 },
+    { id:"厚切沙朗+厚切嫩肩",     name:"厚切沙朗+厚切嫩肩",     price:370 },
+    { id:"松板豬+厚切板腱",       name:"松板豬+厚切板腱",       price:380 },
+    { id:"厚切嫩肩+厚切板腱",     name:"厚切嫩肩+厚切板腱",     price:380 },
   ],
+
   sides: [
     { id:"鐵板麵",     name:"鐵板麵",     price:80, noStaple:true },
-    { id:"鐵板飯",     name:"鐵板飯",     price:80, noStaple:true },
+    // { id:"鐵板飯",     name:"鐵板飯",     price:80, noStaple:true },
     { id:"鐵板通心麵", name:"鐵板通心麵", price:80, noStaple:true },
   ],
 };
